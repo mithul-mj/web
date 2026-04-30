@@ -18,11 +18,16 @@ const CONFIG = {
 
 // --- Ads (Adsterra Placeholders) ---
 // User can replace these with their actual Adsterra script tags
-const AD_TEMPLATES = {
-    key: '6072270e29d424cf8f22eca970769190',
+const AD_TEMPLATES = [
+    { type: 'square',    width: 300, height: 250, key: '6072270e29d424cf8f22eca970769190' },
+    { type: 'wide',      width: 728, height: 90,  key: 'e5746ef115d17ae9083360afbc4eb307' },
+    { type: 'wide_sm',   width: 468, height: 60,  key: 'c3a021b704f4d410018ba1ce0af2962a' },
+    { type: 'tall',      width: 160, height: 600, key: 'd07f8172199f22fd10b8e01ef4816e0b' },
+    { type: 'tall_sm',   width: 160, height: 300, key: '4cbf7f90735c4e43f0af15227850a108' },
+    { type: 'mobile',    width: 320, height: 50,  key: '68e519d6f3b93cabd168d0aa47f013f1' }
+];
+const AD_SETTINGS = {
     format: 'iframe',
-    height: 250,
-    width: 300,
     loadInterval: 3000,   // Load a new ad every 3 seconds
     maxActiveAds: 10      // Maximum number of ads to have in the DOM at once
 };
@@ -1112,28 +1117,36 @@ function attachAdToBuilding(b) {
     if (b.hasAd) return; // Already has one
 
     b.hasAd = true;
-    b.adLoaded = false; // Script hasn't been injected yet
-    b.adIsTop = Math.random() > 0.5;
+    b.adLoaded = false;
+    
+    // Pick a random template
+    const template = AD_TEMPLATES[Math.floor(Math.random() * AD_TEMPLATES.length)];
+    b.adConfig = template;
+
+    // Smart logic: tall ads go on sides, wide ads go on top
+    if (template.type.startsWith('wide') || template.type === 'mobile' || template.type === 'square') {
+        b.adIsTop = Math.random() > 0.4; // Slightly favor top for wide
+    } else {
+        b.adIsTop = false; // Tall ads always on side
+    }
 
     if (b.adIsTop) {
-        b.adWidth = 300;
-        b.adHeight = 120;
-        b.adRelX = random(0, b.width - b.adWidth);
+        b.adWidth = template.width;
+        b.adHeight = template.height;
+        b.adRelX = random(0, Math.max(1, b.width - b.adWidth));
         b.adRelY = -b.adHeight - 45;
     } else {
-        b.adWidth = 200;
-        b.adHeight = 160;
-        b.adRelX = random(20, Math.max(21, b.width - b.adWidth - 20));
+        b.adWidth = template.width;
+        b.adHeight = template.height;
+        b.adRelX = (b.width > b.adWidth) ? random(10, b.width - b.adWidth - 10) : (b.width - b.adWidth)/2;
         b.adRelY = random(10, 80);
     }
 
-    // Create the DOM element (FRAME ONLY)
+    // Create the DOM element
     const adEl = document.createElement('div');
     adEl.className = 'billboard-ad' + (b.adIsTop ? ' on-top' : '');
     adEl.style.width = b.adWidth + 'px';
     adEl.style.height = b.adHeight + 'px';
-    
-    // Placeholder content while waiting for script
     adEl.innerHTML = `<div class="ad-placeholder">CONNECTING...</div>`;
 
     document.getElementById('ad-layer').appendChild(adEl);
@@ -1141,20 +1154,22 @@ function attachAdToBuilding(b) {
 }
 
 function injectAdScript(b) {
-    if (!b.adElement || b.adLoaded || activeAdCount >= AD_TEMPLATES.maxActiveAds) return;
+    if (!b.adElement || b.adLoaded || activeAdCount >= AD_SETTINGS.maxActiveAds) return;
 
     b.adLoaded = true;
     activeAdCount++;
-    b.adElement.innerHTML = ''; // Clear placeholder
+    b.adElement.innerHTML = ''; 
+
+    const config = b.adConfig;
 
     const script1 = document.createElement('script');
     script1.type = 'text/javascript';
     script1.innerHTML = `
         atOptions = {
-            'key' : '${AD_TEMPLATES.key}',
-            'format' : '${AD_TEMPLATES.format}',
-            'height' : ${AD_TEMPLATES.height},
-            'width' : ${AD_TEMPLATES.width},
+            'key' : '${config.key}',
+            'format' : 'iframe',
+            'height' : ${config.height},
+            'width' : ${config.width},
             'params' : {}
         };
     `;
@@ -1162,7 +1177,7 @@ function injectAdScript(b) {
 
     const script2 = document.createElement('script');
     script2.type = 'text/javascript';
-    script2.src = `https://www.highperformanceformat.com/${AD_TEMPLATES.key}/invoke.js`;
+    script2.src = `https://www.highperformanceformat.com/${config.key}/invoke.js`;
     b.adElement.appendChild(script2);
 }
 
