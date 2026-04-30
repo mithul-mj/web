@@ -19,10 +19,10 @@ const CONFIG = {
 // --- Ads (Adsterra Placeholders) ---
 // User can replace these with their actual Adsterra script tags
 const AD_TEMPLATES = {
-    billboard: `
-        <div style="color: #444; font-size: 10px; text-align: center;">ADSTERRA BANNER</div>
-        <img src="https://via.placeholder.com/300x250?text=ADSTERRA+300x250" style="width: 100%; height: auto; display: block;">
-    `
+    key: '6072270e29d424cf8f22eca970769190',
+    format: 'iframe',
+    height: 250,
+    width: 300
 };
 
 // --- Game State ---
@@ -1123,7 +1123,32 @@ function attachAdToBuilding(b) {
     adEl.className = 'billboard-ad' + (b.adIsTop ? ' on-top' : '');
     adEl.style.width = b.adWidth + 'px';
     adEl.style.height = b.adHeight + 'px';
-    adEl.innerHTML = AD_TEMPLATES.billboard;
+    
+    // Inject Adsterra Script Properly
+    // We use a unique ID for each ad unit's atOptions to avoid collisions
+    const adId = 'adsterra-' + Math.floor(Math.random() * 1000000);
+    const scriptContainer = document.createElement('div');
+    scriptContainer.id = adId;
+    adEl.appendChild(scriptContainer);
+
+    const script1 = document.createElement('script');
+    script1.type = 'text/javascript';
+    script1.innerHTML = `
+        atOptions = {
+            'key' : '${AD_TEMPLATES.key}',
+            'format' : '${AD_TEMPLATES.format}',
+            'height' : ${AD_TEMPLATES.height},
+            'width' : ${AD_TEMPLATES.width},
+            'params' : {}
+        };
+    `;
+    adEl.appendChild(script1);
+
+    const script2 = document.createElement('script');
+    script2.type = 'text/javascript';
+    script2.src = `https://www.highperformanceformat.com/${AD_TEMPLATES.key}/invoke.js`;
+    adEl.appendChild(script2);
+
     document.getElementById('ad-layer').appendChild(adEl);
     b.adElement = adEl;
 }
@@ -1932,6 +1957,76 @@ function drawMobileHUD() {
         }
     }
 }
+
+function attachAdToBuilding(b) {
+    if (b.hasAd) return; // Already has one
+
+    b.hasAd = true;
+    b.adIsTop = Math.random() > 0.5;
+
+    if (b.adIsTop) {
+        b.adWidth = 300;
+        b.adHeight = 120;
+        b.adRelX = random(0, b.width - b.adWidth);
+        b.adRelY = -b.adHeight - 45;
+    } else {
+        b.adWidth = 200;
+        b.adHeight = 160;
+        b.adRelX = random(20, Math.max(21, b.width - b.adWidth - 20));
+        b.adRelY = random(10, 80);
+    }
+
+    // Create the DOM element
+    const adEl = document.createElement('div');
+    adEl.className = 'billboard-ad' + (b.adIsTop ? ' on-top' : '');
+    adEl.style.width = b.adWidth + 'px';
+    adEl.style.height = b.adHeight + 'px';
+    
+    // Inject Adsterra Script Properly
+    const adId = 'adsterra-' + Math.floor(Math.random() * 1000000);
+    const scriptContainer = document.createElement('div');
+    scriptContainer.id = adId;
+    adEl.appendChild(scriptContainer);
+
+    const script1 = document.createElement('script');
+    script1.type = 'text/javascript';
+    script1.innerHTML = `
+        atOptions = {
+            'key' : '${AD_TEMPLATES.key}',
+            'format' : '${AD_TEMPLATES.format}',
+            'height' : ${AD_TEMPLATES.height},
+            'width' : ${AD_TEMPLATES.width},
+            'params' : {}
+        };
+    `;
+    adEl.appendChild(script1);
+
+    const script2 = document.createElement('script');
+    script2.type = 'text/javascript';
+    script2.src = `https://www.highperformanceformat.com/${AD_TEMPLATES.key}/invoke.js`;
+    adEl.appendChild(script2);
+
+    document.getElementById('ad-layer').appendChild(adEl);
+    b.adElement = adEl;
+}
+
+function updateBillboards() {
+    for (let b of buildings) {
+        if (b.hasAd && b.adElement) {
+            let screenX = b.x + b.adRelX - gameState.cameraX;
+            let screenY = b.y + b.adRelY - gameState.cameraY;
+
+            // Simple culling
+            if (screenX + b.adWidth < -100 || screenX > gameState.width + 100) {
+                b.adElement.style.display = 'none';
+            } else {
+                b.adElement.style.display = 'flex';
+                b.adElement.style.transform = `translate(${screenX}px, ${screenY}px)`;
+            }
+        }
+    }
+}
+
 
 // --- Draw Player (Gwen Stacy / Ghost-Spider Style) ---
 function drawPlayer() {
