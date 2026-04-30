@@ -28,8 +28,8 @@ const AD_TEMPLATES = [
 ];
 const AD_SETTINGS = {
     format: 'iframe',
-    loadInterval: 3000,   // Load a new ad every 3 seconds
-    maxActiveAds: 10      // Maximum number of ads to have in the DOM at once
+    loadInterval: 1500,   // Load a new ad every 1.5 seconds (was 3s)
+    maxActiveAds: 12      // Slightly increased limit
 };
 
 let adLoadTimer = 0;
@@ -1190,16 +1190,16 @@ function updateBillboards(dt = 1) {
     if (adLoadTimer > AD_SETTINGS.loadInterval) {
         adLoadTimer = 0;
         
-        // Find the best visible building to load an ad for
+        // Find the best visible building to load an ad for (prioritize right-most/newest)
         let bestCandidate = null;
-        let minX = Infinity;
+        let maxX = -Infinity;
 
         for (let b of buildings) {
             if (b.hasAd && !b.adLoaded) {
                 let screenX = b.x - gameState.cameraX;
-                // Prioritize buildings just entering from the right
-                if (screenX > -100 && screenX < gameState.width && screenX < minX) {
-                    minX = screenX;
+                // Pick buildings that are on screen, favoring the ones on the right
+                if (screenX > -100 && screenX < gameState.width + 200 && screenX > maxX) {
+                    maxX = screenX;
                     bestCandidate = b;
                 }
             }
