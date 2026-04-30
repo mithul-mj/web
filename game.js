@@ -817,9 +817,23 @@ function updateSwing(dt) {
         // Tension kicks in
         let overshoot = newDist - player.ropeLength;
 
-        // Push back towards anchor
-        player.x -= (ndx / newDist) * overshoot * CONFIG.swingElasticity;
-        player.y -= (ndy / newDist) * overshoot * CONFIG.swingElasticity;
+        // If grounded, we want to stay on the building but get pulled forward
+        if (player.grounded) {
+            // Only apply horizontal tension to speed up running
+            let pullX = (ndx / newDist) * overshoot * 0.5;
+            player.vx -= pullX; 
+            
+            // Limit vertical pull so we don't "hop" too much unless rope is very short
+            if (ndy > 0) { // Anchor is above us
+                 // Apply a tiny bit of upward force for "lightness" but keep grounded
+                 player.y = player.anchor.y + Math.sqrt(player.ropeLength**2 - ndx**2); 
+                 // Actually, simpler: just keep them on the roof if they are grounded
+            }
+        } else {
+            // Standard air tension
+            player.x -= (ndx / newDist) * overshoot * CONFIG.swingElasticity;
+            player.y -= (ndy / newDist) * overshoot * CONFIG.swingElasticity;
+        }
 
         // Recalculate Velocity (Conservation of momentum along tangent)
         let nndx = player.x - player.anchor.x;
@@ -833,6 +847,11 @@ function updateSwing(dt) {
         let velDot = player.vx * ntx + player.vy * nty;
         player.vx = ntx * velDot;
         player.vy = nty * velDot;
+        
+        // Additional forward "Web Sprint" boost if grounded
+        if (player.grounded && input.active) {
+            player.vx += 0.2 * dt;
+        }
     }
 
     // Air friction (slight)
@@ -1702,64 +1721,72 @@ function draw() {
     if (player.state === 'swinging' && player.anchor) {
         ctx.save();
 
-        // Main strand
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-
         // Calculate origin at the edge of the character towards the anchor
         let wdx = player.anchor.x - player.x;
         let wdy = player.anchor.y - player.y;
         let wdist = Math.sqrt(wdx * wdx + wdy * wdy);
-        let origin = {
-            x: player.x + (wdx / wdist) * 20,
-            y: player.y + (wdy / wdist) * 20
-        };
+        
+        // Multi-strand web if grounded (Web Sprint)
+        let numStrands = player.grounded ? 2 : 1;
+        
+        for (let i = 0; i < numStrands; i++) {
+            let offsetSide = (i - (numStrands - 1) / 2) * 10;
+            
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = player.grounded ? 2 : 3;
+            ctx.beginPath();
 
-        let sdx = player.anchor.x - origin.x;
-        let sdy = player.anchor.y - origin.y;
+            let origin = {
+                x: player.x + (wdx / wdist) * 20,
+                y: player.y + (wdy / wdist) * 20
+            };
+            
+            // Offset origin for multi-strand
+            if (player.grounded) {
+                origin.y += offsetSide;
+            }
 
-        let cp1x = origin.x + sdx * 0.33;
-        let cp1y = origin.y + sdy * 0.33;
+            let sdx = player.anchor.x - origin.x;
+            let sdy = player.anchor.y - origin.y;
 
-        let cp2x = origin.x + sdx * 0.66;
-        let cp2y = origin.y + sdy * 0.66;
+            let cp1x = origin.x + sdx * 0.33;
+            let cp1y = origin.y + sdy * 0.33;
 
-        // Calculate tension/slack based on character weight pulling the rope
-        let slack = player.ropeLength - wdist;
+            let cp2x = origin.x + sdx * 0.66;
+            let cp2y = origin.y + sdy * 0.66;
 
-        // Only curve when there is slack (character weight isn't pulling it taut)
-        if (slack > 0) {
-            // Very short curve offset
-            let curveStrength = Math.min(slack * 0.3, 20);
+            // Calculate tension/slack
+            let slack = player.ropeLength - wdist;
 
-            // Perpendicular vector for the wave
-            let p_len = Math.sqrt(sdx * sdx + sdy * sdy);
-            let px = -sdy / p_len;
-            let py = sdx / p_len;
+            if (slack > 0 && !player.grounded) {
+                let curveStrength = Math.min(slack * 0.3, 20);
+                let p_len = Math.sqrt(sdx * sdx + sdy * sdy);
+                let px = -sdy / p_len;
+                let py = sdx / p_len;
+                let whipDir = player.vx > 0 ? 1 : -1;
 
-            // Bend to 2 sides (S-curve whip effect) based on momentum
-            let whipDir = player.vx > 0 ? 1 : -1;
+                cp1x += px * curveStrength * whipDir;
+                cp1y += py * curveStrength * whipDir;
+                cp2x -= px * curveStrength * whipDir;
+                cp2y -= py * curveStrength * whipDir;
+                cp1y += curveStrength * 0.5;
+                cp2y += curveStrength * 0.5;
+            } else if (player.grounded) {
+                // Taut, vibrating web for sprint
+                let vib = Math.sin(Date.now() * 0.05) * 2;
+                cp1y += vib;
+                cp2y -= vib;
+            }
 
-            cp1x += px * curveStrength * whipDir;
-            cp1y += py * curveStrength * whipDir;
+            ctx.moveTo(origin.x, origin.y);
+            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, player.anchor.x, player.anchor.y);
+            ctx.stroke();
 
-            cp2x -= px * curveStrength * whipDir;
-            cp2y -= py * curveStrength * whipDir;
-
-            // Sag downwards due to gravity/weight
-            cp1y += curveStrength * 0.5;
-            cp2y += curveStrength * 0.5;
+            // Bright core
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
         }
-
-        ctx.moveTo(origin.x, origin.y);
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, player.anchor.x, player.anchor.y);
-        ctx.stroke();
-
-        // Bright core
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1;
-        ctx.stroke();
         ctx.restore();
 
         // Anchor impact splash
