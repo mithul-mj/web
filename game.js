@@ -22,8 +22,13 @@ const AD_TEMPLATES = {
     key: '6072270e29d424cf8f22eca970769190',
     format: 'iframe',
     height: 250,
-    width: 300
+    width: 300,
+    loadInterval: 3000,   // Load a new ad every 3 seconds
+    maxActiveAds: 10      // Maximum number of ads to have in the DOM at once
 };
+
+let adLoadTimer = 0;
+let activeAdCount = 0;
 
 // --- Game State ---
 let gameState = {
@@ -493,6 +498,8 @@ function resetGame() {
     // Clear all existing ads
     const adLayer = document.getElementById('ad-layer');
     if (adLayer) adLayer.innerHTML = '';
+    activeAdCount = 0;
+    adLoadTimer = 0;
 }
 
 function resize() {
@@ -751,7 +758,7 @@ function update(baseTimeScale = 1.0) {
     document.getElementById('score').innerText = gameState.distance + "m";
 
     // 7. Billboards
-    updateBillboards();
+    updateBillboards(dt);
 }
 
 function updateFall(dt) {
@@ -1091,6 +1098,7 @@ function cleanupWorld() {
     // Remove ads from DOM before filtering buildings
     for (let b of buildings) {
         if (b.x + b.width < limit && b.adElement) {
+            if (b.adLoaded) activeAdCount--;
             b.adElement.remove();
             b.adElement = null;
         }
@@ -1104,6 +1112,7 @@ function attachAdToBuilding(b) {
     if (b.hasAd) return; // Already has one
 
     b.hasAd = true;
+    b.adLoaded = false; // Script hasn't been injected yet
     b.adIsTop = Math.random() > 0.5;
 
     if (b.adIsTop) {
@@ -1118,18 +1127,25 @@ function attachAdToBuilding(b) {
         b.adRelY = random(10, 80);
     }
 
-    // Create the DOM element
+    // Create the DOM element (FRAME ONLY)
     const adEl = document.createElement('div');
     adEl.className = 'billboard-ad' + (b.adIsTop ? ' on-top' : '');
     adEl.style.width = b.adWidth + 'px';
     adEl.style.height = b.adHeight + 'px';
     
-    // Inject Adsterra Script Properly
-    // We use a unique ID for each ad unit's atOptions to avoid collisions
-    const adId = 'adsterra-' + Math.floor(Math.random() * 1000000);
-    const scriptContainer = document.createElement('div');
-    scriptContainer.id = adId;
-    adEl.appendChild(scriptContainer);
+    // Placeholder content while waiting for script
+    adEl.innerHTML = `<div class="ad-placeholder">CONNECTING...</div>`;
+
+    document.getElementById('ad-layer').appendChild(adEl);
+    b.adElement = adEl;
+}
+
+function injectAdScript(b) {
+    if (!b.adElement || b.adLoaded || activeAdCount >= AD_TEMPLATES.maxActiveAds) return;
+
+    b.adLoaded = true;
+    activeAdCount++;
+    b.adElement.innerHTML = ''; // Clear placeholder
 
     const script1 = document.createElement('script');
     script1.type = 'text/javascript';
@@ -1142,25 +1158,48 @@ function attachAdToBuilding(b) {
             'params' : {}
         };
     `;
-    adEl.appendChild(script1);
+    b.adElement.appendChild(script1);
 
     const script2 = document.createElement('script');
     script2.type = 'text/javascript';
     script2.src = `https://www.highperformanceformat.com/${AD_TEMPLATES.key}/invoke.js`;
-    adEl.appendChild(script2);
-
-    document.getElementById('ad-layer').appendChild(adEl);
-    b.adElement = adEl;
+    b.adElement.appendChild(script2);
 }
 
-function updateBillboards() {
+function updateBillboards(dt = 1) {
+    // 1. Process Ad Loading Queue
+    adLoadTimer += dt * 16.66; // Approx ms
+    if (adLoadTimer > AD_TEMPLATES.loadInterval) {
+        adLoadTimer = 0;
+        
+        // Find the best visible building to load an ad for
+        let bestCandidate = null;
+        let minX = Infinity;
+
+        for (let b of buildings) {
+            if (b.hasAd && !b.adLoaded) {
+                let screenX = b.x - gameState.cameraX;
+                // Prioritize buildings just entering from the right
+                if (screenX > -100 && screenX < gameState.width && screenX < minX) {
+                    minX = screenX;
+                    bestCandidate = b;
+                }
+            }
+        }
+
+        if (bestCandidate) {
+            injectAdScript(bestCandidate);
+        }
+    }
+
+    // 2. Position and Cull
     for (let b of buildings) {
         if (b.hasAd && b.adElement) {
             let screenX = b.x + b.adRelX - gameState.cameraX;
             let screenY = b.y + b.adRelY - gameState.cameraY;
 
             // Simple culling
-            if (screenX + b.adWidth < -100 || screenX > gameState.width + 100) {
+            if (screenX + b.adWidth < -300 || screenX > gameState.width + 300) {
                 b.adElement.style.display = 'none';
             } else {
                 b.adElement.style.display = 'flex';
