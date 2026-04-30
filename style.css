@@ -1,0 +1,250 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;600;900&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    background-color: #050508;
+    color: #fff;
+    overflow: hidden;
+    font-family: 'Outfit', sans-serif;
+    height: 100vh;
+    width: 100vw;
+    touch-action: none;
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+}
+
+#ad-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+    overflow: hidden;
+}
+
+.billboard-ad {
+    position: absolute;
+    pointer-events: auto;
+    background: #000;
+    border: 4px solid #333;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5), 0 0 10px rgba(255,255,255,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    /* Ensure the ad doesn't look like a flat image by adding a slight perspective-like border */
+    border-bottom: 8px solid #222;
+}
+
+.billboard-ad.on-top {
+    border-bottom: 4px solid #333;
+    overflow: visible; /* Show the legs */
+}
+
+/* The vertical legs for top billboards */
+.billboard-ad.on-top::before,
+.billboard-ad.on-top::after {
+    content: '';
+    position: absolute;
+    bottom: -40px; /* Length of legs */
+    width: 6px;
+    height: 40px;
+    background: #444;
+    border-left: 2px solid #222;
+    z-index: -1;
+}
+
+.billboard-ad.on-top::before { left: 25%; }
+.billboard-ad.on-top::after { right: 25%; }
+
+/* Small light fixtures on top of billboards */
+.billboard-ad::after {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 10%;
+    right: 10%;
+    height: 4px;
+    background: repeating-linear-gradient(90deg, #555, #555 10px, transparent 10px, transparent 40px);
+}
+
+#ui-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    padding: 30px;
+    background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.4) 100%);
+    z-index: 10;
+}
+
+#score {
+    font-size: 3.5rem;
+    font-weight: 900;
+    letter-spacing: -2px;
+    background: linear-gradient(180deg, #fff 0%, #aaa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
+}
+
+#instructions {
+    position: absolute;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1rem;
+    font-weight: 300;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    opacity: 0.8;
+    animation: pulseFade 2s infinite alternate;
+}
+
+@keyframes pulseFade {
+    from { opacity: 0.4; transform: translateX(-50%) scale(0.98); }
+    to { opacity: 0.9; transform: translateX(-50%) scale(1); }
+}
+
+#game-over {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    background: rgba(15, 15, 20, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 60px;
+    border-radius: 24px;
+    pointer-events: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    animation: modalIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalIn {
+    from { opacity: 0; transform: translate(-50%, -40%) scale(0.9); }
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+#game-over h1 {
+    font-size: 4rem;
+    font-weight: 900;
+    margin-bottom: 10px;
+    background: linear-gradient(to bottom, #ff4444, #880000);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-transform: uppercase;
+}
+
+#game-over p {
+    font-size: 1.4rem;
+    margin-bottom: 30px;
+    color: #999;
+}
+
+button {
+    background: #fff;
+    color: #000;
+    border: none;
+    padding: 16px 40px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 12px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 10px 20px rgba(255,255,255,0.1);
+    /* Mobile: ensure touch target is at least 48px */
+    min-height: 48px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(255,255,255,0.2);
+}
+
+button:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 15px 30px rgba(255,255,255,0.2);
+    background: #f0f0f0;
+}
+
+button:active {
+    transform: translateY(0) scale(0.98);
+}
+
+#game-over {
+    /* Ensure game-over modal intercepts all touch events */
+    touch-action: auto;
+}
+
+#controls-hint {
+    position: absolute;
+    bottom: 40px;
+    width: 100%;
+    text-align: center;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    pointer-events: none;
+    /* Safe area for notched phones */
+    padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+#controls-hint span {
+    color: #ff4444;
+    font-weight: 600;
+    margin: 0 4px;
+}
+
+/* Desktop: show desktop hint, hide mobile hint */
+.mobile-hint { display: none; }
+.desktop-hint { display: inline; }
+
+@media (max-width: 800px), (pointer: coarse) {
+    .desktop-hint { display: none !important; }
+    .mobile-hint { display: inline !important; }
+    #score { font-size: 2.5rem; }
+
+    button {
+        padding: 18px 50px;
+        font-size: 1.2rem;
+        min-height: 56px;
+    }
+
+    #game-over {
+        padding: 40px;
+    }
+
+    #controls-hint {
+        bottom: 20px;
+        font-size: 0.7rem;
+        letter-spacing: 1px;
+    }
+
+    /* Safe area insets for notched phones */
+    #ui-overlay {
+        padding: 20px;
+        padding-top: max(20px, env(safe-area-inset-top));
+        padding-left: max(20px, env(safe-area-inset-left));
+        padding-right: max(20px, env(safe-area-inset-right));
+    }
+}

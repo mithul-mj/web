@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Shadow Swing</title>
+    <link rel="stylesheet" href="style.css">
+    <meta name="description"
+        content="A high-speed, momentum-based swing runner where skill comes from timing and angles.">
+
+    <!-- PWA / Play Store -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#050508">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+</head>
+
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="ad-layer"></div>
+    <div id="ui-overlay">
+        <div id="score">0m</div>
+        <div id="instructions">Tap / Click to Swing</div>
+        <div id="game-over" style="display: none;">
+            <h1>CRASHED</h1>
+            <p id="final-score">Distance: 0m</p>
+            <button id="restart-btn">Try Again</button>
+        </div>
+        <div id="controls-hint">
+            <span class="desktop-hint">
+                <span>1. Hold Space/Click</span> to Swing
+                &nbsp;&nbsp;&rarr;&nbsp;&nbsp;
+                <span>Scroll</span> to Climb
+                &nbsp;&nbsp;&rarr;&nbsp;&nbsp;
+                <span>2. Release</span> to Jump
+            </span>
+            <span class="mobile-hint">
+                <span>1. Touch &amp; Hold</span> to Swing
+                &nbsp;&nbsp;&rarr;&nbsp;&nbsp;
+                <span>Swipe &uarr;&darr;</span> to Climb
+                &nbsp;&nbsp;&rarr;&nbsp;&nbsp;
+                <span>2. Release</span> to Jump
+            </span>
+        </div>
+    </div>
+    <script src="game.js"></script>
+    <script>
+        // Register Service Worker for PWA / offline support
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('[PWA] Service Worker registered:', reg.scope))
+                    .catch(err => console.warn('[PWA] SW registration failed:', err));
+            });
+        }
+    </script>
+</body>
+
+</html>
