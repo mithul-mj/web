@@ -13,7 +13,7 @@ const CONFIG = {
     cameraCatchup: 0.08,
     maxFallSpeed: 16,
     swingElasticity: 0.8, // How much the web "stretches"
-    adFrequency: 0.8      // 80% chance for a building to have an ad
+    adFrequency: 1.0      // 100% chance for a building to have an ad
 };
 
 // --- Ads (Adsterra Placeholders) ---
@@ -405,8 +405,10 @@ function resetGame() {
         y: gameState.height - 150,
         width: 2000,
         height: 200,
-        type: 'ground'
+        type: 'ground',
+        hasAd: false
     });
+    attachAdToBuilding(buildings[0]); // Add ad to runway
 
     // Spawn birds on runway
     for (let j = 0; j < 5; j++) {
@@ -457,8 +459,10 @@ function resetGame() {
                 height: 2000,
                 type: 'building',
                 color: `hsl(${210 + Math.random() * 20}, ${10 + Math.random() * 10}%, ${15 + Math.random() * 10}%)`,
-                windowSeed: Math.random()
+                windowSeed: Math.random(),
+                hasAd: false
             });
+            attachAdToBuilding(buildings[buildings.length - 1]); // Add ad to crane building
 
             // Spawn birds on these buildings
             let bLeft = craneStartX + (i * spacing) - 100;
@@ -1012,33 +1016,8 @@ function generateWorld() {
         });
 
         let b = buildings[buildings.length - 1];
+        attachAdToBuilding(b);
 
-        // Add Billboard Ad to almost any building
-        if (Math.random() < CONFIG.adFrequency) {
-            b.hasAd = true;
-            b.adIsTop = Math.random() > 0.5; // 50% chance to be on top
-
-            if (b.adIsTop) {
-                b.adWidth = 300;
-                b.adHeight = 120;
-                b.adRelX = random(0, b.width - b.adWidth);
-                b.adRelY = -b.adHeight - 45; // Place above roof with leg gap
-            } else {
-                b.adWidth = 200;
-                b.adHeight = 160;
-                b.adRelX = random(20, b.width - b.adWidth - 20);
-                b.adRelY = random(10, 80); // Closer to the top (was 50-150)
-            }
-
-            // Create the DOM element
-            const adEl = document.createElement('div');
-            adEl.className = 'billboard-ad' + (b.adIsTop ? ' on-top' : '');
-            adEl.style.width = b.adWidth + 'px';
-            adEl.style.height = b.adHeight + 'px';
-            adEl.innerHTML = AD_TEMPLATES.billboard;
-            document.getElementById('ad-layer').appendChild(adEl);
-            b.adElement = adEl;
-        }
         let numBirds = 1 + Math.floor(Math.random() * 4); // Ensure at least 1 bird per building
         for (let j = 0; j < numBirds; j++) {
             let onTier = b.hasTier && Math.random() > 0.5;
@@ -1119,6 +1098,34 @@ function cleanupWorld() {
 
     buildings = buildings.filter(b => b.x + b.width > limit);
     anchors = anchors.filter(a => a.x > limit);
+}
+
+function attachAdToBuilding(b) {
+    if (b.hasAd) return; // Already has one
+
+    b.hasAd = true;
+    b.adIsTop = Math.random() > 0.5;
+
+    if (b.adIsTop) {
+        b.adWidth = 300;
+        b.adHeight = 120;
+        b.adRelX = random(0, b.width - b.adWidth);
+        b.adRelY = -b.adHeight - 45;
+    } else {
+        b.adWidth = 200;
+        b.adHeight = 160;
+        b.adRelX = random(20, Math.max(21, b.width - b.adWidth - 20));
+        b.adRelY = random(10, 80);
+    }
+
+    // Create the DOM element
+    const adEl = document.createElement('div');
+    adEl.className = 'billboard-ad' + (b.adIsTop ? ' on-top' : '');
+    adEl.style.width = b.adWidth + 'px';
+    adEl.style.height = b.adHeight + 'px';
+    adEl.innerHTML = AD_TEMPLATES.billboard;
+    document.getElementById('ad-layer').appendChild(adEl);
+    b.adElement = adEl;
 }
 
 function updateBillboards() {
