@@ -415,10 +415,14 @@ function resetGame() {
         y: gameState.height - 150,
         width: 2000,
         height: 200,
-        type: 'ground',
-        hasAd: false
+        type: 'ground'
     });
-    attachAdToBuilding(buildings[0]); // Add ad to runway
+    // Add a specific, visible ad to the runway near the start
+    let runwayAd = buildings[0];
+    runwayAd.adIsTop = true; // Ensure it's on top before attaching
+    attachAdToBuilding(runwayAd);
+    runwayAd.adRelX = 600; // Force it to be near the start of the runway
+    runwayAd.adRelY = -runwayAd.adHeight - 45;
 
     // Spawn birds on runway
     for (let j = 0; j < 5; j++) {
@@ -469,8 +473,7 @@ function resetGame() {
                 height: 2000,
                 type: 'building',
                 color: `hsl(${210 + Math.random() * 20}, ${10 + Math.random() * 10}%, ${15 + Math.random() * 10}%)`,
-                windowSeed: Math.random(),
-                hasAd: false
+                windowSeed: Math.random()
             });
             attachAdToBuilding(buildings[buildings.length - 1]); // Add ad to crane building
 
@@ -1184,7 +1187,7 @@ function injectAdScript(b) {
 function updateBillboards(dt = 1) {
     // 1. Process Ad Loading Queue
     adLoadTimer += dt * 16.66; // Approx ms
-    if (adLoadTimer > AD_TEMPLATES.loadInterval) {
+    if (adLoadTimer > AD_SETTINGS.loadInterval) {
         adLoadTimer = 0;
         
         // Find the best visible building to load an ad for
