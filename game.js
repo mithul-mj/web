@@ -1516,11 +1516,34 @@ function draw() {
 
     // Buildings
     for (let b of buildings) {
+        // --- Building Body (Classic Old Brick) ---
         let bGrad = ctx.createLinearGradient(0, b.y, 0, b.y + 800);
-        bGrad.addColorStop(0, b.color || '#1a1a1a');
-        bGrad.addColorStop(1, '#050508');
+        // Brick-themed color palette (Weathered Red/Brown/Tan)
+        let brickColors = ['#8b4513', '#a52a2a', '#7b3f00', '#5c4033', '#800000'];
+        let baseColor = brickColors[Math.floor(b.windowSeed * brickColors.length)];
+        
+        bGrad.addColorStop(0, baseColor);
+        bGrad.addColorStop(1, '#1a0d0a'); // Darker bottom
         ctx.fillStyle = bGrad;
         ctx.fillRect(b.x, b.y, b.width, b.height);
+
+        // --- Repeating Brick Pattern ---
+        ctx.save();
+        ctx.globalAlpha = 0.2; // Subtle texture
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 0.5;
+        let brickW = 20;
+        let brickH = 10;
+        
+        // Only draw bricks in visible areas
+        for (let by = b.y; by < b.y + b.height; by += brickH) {
+            if (by > gameState.cameraY + gameState.height || by + brickH < gameState.cameraY) continue;
+            let offset = (Math.floor(by / brickH) % 2 === 0) ? 0 : brickW / 2;
+            for (let bx = b.x; bx < b.x + b.width; bx += brickW) {
+                ctx.strokeRect(bx + offset, by, brickW, brickH);
+            }
+        }
+        ctx.restore();
 
         // --- Detailed Rooftop Cap (Inspired by tiled/brick ledge) ---
         let roofX = b.x;
