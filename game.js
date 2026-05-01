@@ -71,39 +71,57 @@ const player = {
     trails: [] // Motion trail
 };
 
-// --- Sprites ---
-const sprites = {
-    run: {
-        img: new Image(),
-        loaded: false,
-        cols: 5, // 5x5 grid for 1280x1280
-        rows: 5,
-        totalFrames: 25
-    },
-    swing: {
-        img: new Image(),
-        loaded: false,
-        cols: 5,
-        rows: 5,
-        totalFrames: 25
-    },
-    bird: {
-        img: new Image(),
-        loaded: false,
-        cols: 6,
-        rows: 6,
-        totalFrames: 36
+// --- Sprite Pre-processing (Chroma Key) ---
+function processSpriteSheet(img, callback) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    // More aggressive removal: catch near-black and fade edges
+    for (let i = 0; i < data.length; i += 4) {
+        let r = data[i], g = data[i+1], b = data[i+2];
+        let brightness = (r + g + b) / 3;
+        
+        if (brightness < 45) {
+            // Smoothly fade pixels that are nearly black
+            if (brightness < 25) {
+                data[i+3] = 0; // Pure transparent
+            } else {
+                // Fade from 25 to 45 brightness
+                let alphaFactor = (brightness - 25) / 20;
+                data[i+3] = Math.floor(data[i+3] * alphaFactor);
+            }
+        }
     }
+    ctx.putImageData(imageData, 0, 0);
+    const newImg = new Image();
+    newImg.onload = () => callback(newImg);
+    newImg.src = canvas.toDataURL();
+}
+
+// --- Image Assets ---
+const sprites = {
+    run: { src: 'sheets/run.png', img: new Image(), loaded: false, cols: 5, rows: 5, totalFrames: 25 },
+    swing: { src: 'sheets/swing.png', img: new Image(), loaded: false, cols: 5, rows: 5, totalFrames: 25 },
+    bird: { src: 'sheets/bird.png', img: new Image(), loaded: false, cols: 6, rows: 6, totalFrames: 36 }
 };
 
-sprites.run.img.src = 'sheets/run.png';
-sprites.run.img.onload = () => { sprites.run.loaded = true; };
-
-sprites.swing.img.src = 'sheets/swing.png';
-sprites.swing.img.onload = () => { sprites.swing.loaded = true; };
-
-sprites.bird.img.src = 'sheets/bird.png';
-sprites.bird.img.onload = () => { sprites.bird.loaded = true; };
+// Load all sprites with pre-processing to ensure transparency
+Object.keys(sprites).forEach(key => {
+    const s = sprites[key];
+    const tempImg = new Image();
+    tempImg.onload = () => {
+        processSpriteSheet(tempImg, (processed) => {
+            s.img = processed;
+            s.loaded = true;
+        });
+    };
+    tempImg.src = s.src;
+});
 
 // --- Sounds ---
 const sounds = {
@@ -1785,10 +1803,6 @@ function drawPlayerOnCtx(targetCtx) {
 
         if (currentSprite === sprites.run) {
             dy = player.radius - (drawH * 0.95);
-        } else {
-            // All other states (swing/fall) use the black-background sprite
-            // We use 'screen' to remove the black box
-            targetCtx.globalCompositeOperation = 'screen';
         }
 
         targetCtx.drawImage(
