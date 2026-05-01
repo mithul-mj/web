@@ -1738,36 +1738,72 @@ function draw() {
 }
 
 function drawPlayerOnCtx(targetCtx) {
-    const sprites_copy = sprites; // Use global sprites
-    targetCtx.lineCap = 'round'; targetCtx.lineJoin = 'round';
+    targetCtx.lineCap = 'round';
+    targetCtx.lineJoin = 'round';
+
     let targetAngle = 0;
     if (player.state === 'swinging' && player.anchor) {
-        let dx = player.x - player.anchor.x; let dy = player.y - player.anchor.y;
+        let dx = player.x - player.anchor.x;
+        let dy = player.y - player.anchor.y;
         targetAngle = Math.atan2(dy, dx) - Math.PI / 2;
     } else {
         targetAngle = Math.atan2(player.vy, player.vx * 1.5) / 1.5;
         targetAngle = clamp(targetAngle, -0.6, 0.6);
     }
+
     targetCtx.save();
     targetCtx.translate(player.x, player.y);
     targetCtx.rotate(targetAngle);
+
     let speed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
-    let currentSprite = null; let frameIndex = 0;
-    if (player.state === 'swinging' && player.anchor) { currentSprite = sprites_copy.swing; frameIndex = Math.floor(player.animTimer * 8) % currentSprite.totalFrames; }
-    else if (player.grounded) { currentSprite = sprites_copy.run; frameIndex = Math.floor(player.animTimer * speed * 0.4) % currentSprite.totalFrames; }
-    else { currentSprite = sprites_copy.swing; frameIndex = Math.floor(player.animTimer * 5) % currentSprite.totalFrames; }
+    let currentSprite = null;
+    let frameIndex = 0;
+
+    // Choose sprite based on state
+    if (player.state === 'swinging') {
+        currentSprite = sprites.swing;
+        frameIndex = Math.floor(player.animTimer * 8) % currentSprite.totalFrames;
+    } else if (player.grounded) {
+        currentSprite = sprites.run;
+        frameIndex = Math.floor(player.animTimer * speed * 0.4) % currentSprite.totalFrames;
+    } else {
+        // Airborne/Falling
+        currentSprite = sprites.swing;
+        frameIndex = Math.floor(player.animTimer * 5) % currentSprite.totalFrames;
+    }
 
     if (currentSprite && currentSprite.loaded) {
         let frameWidth = currentSprite.img.width / currentSprite.cols;
         let frameHeight = currentSprite.img.height / currentSprite.rows;
-        let col = frameIndex % currentSprite.cols; let row = Math.floor(frameIndex / currentSprite.cols);
-        let drawW = 64; let drawH = 64; let dx = -drawW / 2; let dy = -drawH / 2;
-        if (currentSprite === sprites_copy.run) dy = player.radius - (drawH * 0.95);
-        else if (currentSprite === sprites_copy.swing) targetCtx.globalCompositeOperation = 'screen';
-        targetCtx.drawImage(currentSprite.img, col * frameWidth, row * frameHeight, frameWidth, frameHeight, dx, dy, drawW, drawH);
+        let col = frameIndex % currentSprite.cols;
+        let row = Math.floor(frameIndex / currentSprite.cols);
+
+        let drawW = 64;
+        let drawH = 64;
+        let dx = -drawW / 2;
+        let dy = -drawH / 2;
+
+        if (currentSprite === sprites.run) {
+            dy = player.radius - (drawH * 0.95);
+        } else {
+            // All other states (swing/fall) use the black-background sprite
+            // We use 'screen' to remove the black box
+            targetCtx.globalCompositeOperation = 'screen';
+        }
+
+        targetCtx.drawImage(
+            currentSprite.img,
+            col * frameWidth, row * frameHeight, frameWidth, frameHeight,
+            dx, dy, drawW, drawH
+        );
+        
         targetCtx.globalCompositeOperation = 'source-over';
     } else {
-        targetCtx.fillStyle = '#ff00ff'; targetCtx.beginPath(); targetCtx.arc(0, 0, player.radius, 0, Math.PI * 2); targetCtx.fill();
+        // Fallback
+        targetCtx.fillStyle = '#ff00ff';
+        targetCtx.beginPath();
+        targetCtx.arc(0, 0, player.radius, 0, Math.PI * 2);
+        targetCtx.fill();
     }
     targetCtx.restore();
 }
