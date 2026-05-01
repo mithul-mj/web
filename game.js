@@ -1,5 +1,7 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const pCanvas = document.getElementById('playerCanvas');
+const pCtx = pCanvas.getContext('2d');
 
 // --- Configuration ---
 const CONFIG = {
@@ -547,6 +549,14 @@ function resize() {
             adLayer.style.transformOrigin = 'top left';
             adLayer.style.transform = 'rotate(90deg) translateY(-100%)';
         }
+        
+        // Sync Player Canvas
+        pCanvas.width = gameState.width;
+        pCanvas.height = gameState.height;
+        pCanvas.style.width = screenH + 'px';
+        pCanvas.style.height = screenW + 'px';
+        pCanvas.style.transformOrigin = 'top left';
+        pCanvas.style.transform = 'rotate(90deg) translateY(-100%)';
         document.body.style.overflow = 'hidden';
     } else {
         isPortrait = false;
@@ -576,6 +586,13 @@ function resize() {
             adLayer.style.transformOrigin = '';
             adLayer.style.transform = '';
         }
+
+        // Sync Player Canvas
+        pCanvas.width = gameState.width;
+        pCanvas.height = gameState.height;
+        pCanvas.style.transform = 'none';
+        pCanvas.style.width = '100%';
+        pCanvas.style.height = '100%';
     }
     updateMobileButtonLayout();
 }
@@ -1373,10 +1390,52 @@ function drawCrane(ctx, anchorX, anchorY, isAligned) {
     ctx.restore();
 }
 
+// --- Web Drawing (On pCtx) ---
+function drawWeb() {
+    if (player.anchor) {
+        let ax = player.anchor.x;
+        let ay = player.anchor.y;
+        let px = player.x;
+        let py = player.y;
+
+        pCtx.beginPath();
+        pCtx.moveTo(ax, ay);
+        pCtx.lineTo(px, py);
+        pCtx.strokeStyle = '#fff';
+        pCtx.lineWidth = 2;
+        pCtx.stroke();
+
+        // Web detail
+        pCtx.beginPath();
+        pCtx.arc(ax, ay, 4, 0, Math.PI * 2);
+        pCtx.fillStyle = '#fff';
+        pCtx.fill();
+    }
+}
+
 // --- Draw ---
 function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // 1. Clear both canvases
+    ctx.clearRect(0, 0, gameState.width, gameState.height);
+    pCtx.clearRect(0, 0, gameState.width, gameState.height);
 
+    // 2. Draw Background & Buildings on BOTTOM canvas
+    drawBackground();
+    
+    ctx.save();
+    ctx.translate(-gameState.cameraX, -gameState.cameraY);
+    drawBuildings();
+    ctx.restore();
+
+    // 3. Draw Player & Webs on TOP canvas (above ads)
+    pCtx.save();
+    pCtx.translate(-gameState.cameraX, -gameState.cameraY);
+    drawWeb();
+    drawPlayer();
+    pCtx.restore();
+}
+
+function drawBackground() {
     // Background Sky Gradient
     let skyGrad = ctx.createLinearGradient(0, 0, 0, gameState.height);
     skyGrad.addColorStop(0, '#050508');
@@ -1477,10 +1536,9 @@ function draw() {
         ctx.fillRect(off + 1100, gameState.height - 350, 180, 500);
     }
     ctx.restore();
+}
 
-    ctx.save();
-    ctx.translate(-gameState.cameraX, -gameState.cameraY);
-
+function drawBuildings() {
     // 2. Cranes (Background layer)
     for (let a of anchors) {
         if (a.type === 'crane') {
@@ -1709,9 +1767,43 @@ function draw() {
             ctx.fillText("UPPER WEST", b.x + b.width / 2, b.y + 140);
         }
 
-        // Top Ledge
-        ctx.fillStyle = '#222';
-        ctx.fillRect(b.x - 2, b.y, b.width + 4, 8);
+        // --- 5. Tiled Ledge / Roof Cap (Upgrade) ---
+        let ledgeHeight = 12;
+        let ledgeColor = b.color;
+        
+        // Main Building Ledge
+        ctx.save();
+        ctx.fillStyle = ledgeColor;
+        ctx.filter = 'brightness(1.8)'; // Make it much lighter for the ledge
+        ctx.fillRect(b.x - 4, b.y - ledgeHeight / 2, b.width + 8, ledgeHeight);
+        
+        // Tile Segments
+        ctx.filter = 'none';
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+        ctx.lineWidth = 1;
+        let tWidth = 40;
+        for (let lx = b.x - 4; lx < b.x + b.width + 4; lx += tWidth) {
+            ctx.beginPath();
+            ctx.moveTo(lx, b.y - ledgeHeight / 2);
+            ctx.lineTo(lx, b.y + ledgeHeight / 2);
+            ctx.stroke();
+        }
+
+        // Tier Ledge (if exists)
+        if (b.hasTier) {
+            let tx = b.x + (b.width - b.tierWidth) / 2;
+            let ty = b.y - b.tierHeight;
+            ctx.filter = 'brightness(1.8)';
+            ctx.fillRect(tx - 4, ty - ledgeHeight / 2, b.tierWidth + 8, ledgeHeight);
+            ctx.filter = 'none';
+            for (let tlx = tx - 4; tlx < tx + b.tierWidth + 4; tlx += tWidth) {
+                ctx.beginPath();
+                ctx.moveTo(tlx, ty - ledgeHeight / 2);
+                ctx.lineTo(tlx, ty + ledgeHeight / 2);
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
     }
 
     // Birds
@@ -2085,7 +2177,7 @@ function updateBillboards() {
 }
 
 
-// --- Draw Player (Gwen Stacy / Ghost-Spider Style) ---
+// --- Draw Player (Gwen Stacy / Ghost-Spider Style) (On pCtx) ---
 function drawPlayer() {
     // Colors (Gwen Suit: White, Black, Magenta/Cyan highlights)
     const C_WHITE = '#ffffff';
@@ -2093,8 +2185,8 @@ function drawPlayer() {
     const C_PINK = '#ff00ff';
     const C_CYAN = '#00ffff';
 
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    pCtx.lineCap = 'round';
+    pCtx.lineJoin = 'round';
 
     let px = player.x;
     let py = player.y;
@@ -2113,9 +2205,9 @@ function drawPlayer() {
     }
     let angle = targetAngle;
 
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(angle);
+    pCtx.save();
+    pCtx.translate(px, py);
+    pCtx.rotate(angle);
 
     let t = player.animTimer;
 
@@ -2158,29 +2250,29 @@ function drawPlayer() {
             dy = player.radius - (drawH * 0.95);
         } else if (currentSprite === sprites.swing) {
             // Swing sprite has a solid dark background, use lighten/screen to blend it
-            ctx.globalCompositeOperation = 'screen';
+            pCtx.globalCompositeOperation = 'screen';
             // Center the swing sprite
             dy = -drawH / 2;
         }
 
         // Offset the drawing to center on the character or feet
-        ctx.drawImage(
+        pCtx.drawImage(
             currentSprite.img,
             col * frameWidth, row * frameHeight, frameWidth, frameHeight,
             dx, dy, drawW, drawH
         );
 
         // Reset composite operation
-        ctx.globalCompositeOperation = 'source-over';
+        pCtx.globalCompositeOperation = 'source-over';
     } else {
         // Fallback if images aren't loaded yet
-        ctx.fillStyle = '#ff00ff';
-        ctx.beginPath();
-        ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
-        ctx.fill();
+        pCtx.fillStyle = '#ff00ff';
+        pCtx.beginPath();
+        pCtx.arc(0, 0, player.radius, 0, Math.PI * 2);
+        pCtx.fill();
     }
 
-    ctx.restore();
+    pCtx.restore();
 }
 
 function random(min, max) { return Math.random() * (max - min) + min; }
