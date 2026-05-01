@@ -1,7 +1,7 @@
 const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+const ctx = canvas ? canvas.getContext('2d') : null;
 const pCanvas = document.getElementById('playerCanvas');
-const pCtx = pCanvas.getContext('2d');
+const pCtx = pCanvas ? pCanvas.getContext('2d') : null;
 
 // --- Configuration ---
 const CONFIG = {
@@ -1392,6 +1392,7 @@ function drawCrane(ctx, anchorX, anchorY, isAligned) {
 
 // --- Web Drawing (On pCtx) ---
 function drawWeb() {
+    if (!pCtx) return;
     if (player.anchor) {
         let ax = player.anchor.x;
         let ay = player.anchor.y;
@@ -1416,23 +1417,27 @@ function drawWeb() {
 // --- Draw ---
 function draw() {
     // 1. Clear both canvases
-    ctx.clearRect(0, 0, gameState.width, gameState.height);
-    pCtx.clearRect(0, 0, gameState.width, gameState.height);
+    if (ctx) ctx.clearRect(0, 0, gameState.width, gameState.height);
+    if (pCtx) pCtx.clearRect(0, 0, gameState.width, gameState.height);
 
     // 2. Draw Background & Buildings on BOTTOM canvas
-    drawBackground();
-    
-    ctx.save();
-    ctx.translate(-gameState.cameraX, -gameState.cameraY);
-    drawBuildings();
-    ctx.restore();
+    if (ctx) {
+        drawBackground();
+        
+        ctx.save();
+        ctx.translate(-gameState.cameraX, -gameState.cameraY);
+        drawBuildings();
+        ctx.restore();
+    }
 
     // 3. Draw Player & Webs on TOP canvas (above ads)
-    pCtx.save();
-    pCtx.translate(-gameState.cameraX, -gameState.cameraY);
-    drawWeb();
-    drawPlayer();
-    pCtx.restore();
+    if (pCtx) {
+        pCtx.save();
+        pCtx.translate(-gameState.cameraX, -gameState.cameraY);
+        drawWeb();
+        drawPlayer();
+        pCtx.restore();
+    }
 }
 
 function drawBackground() {
@@ -2179,6 +2184,7 @@ function updateBillboards() {
 
 // --- Draw Player (Gwen Stacy / Ghost-Spider Style) (On pCtx) ---
 function drawPlayer() {
+    if (!pCtx) return;
     // Colors (Gwen Suit: White, Black, Magenta/Cyan highlights)
     const C_WHITE = '#ffffff';
     const C_BLACK = '#0d0d0d';
