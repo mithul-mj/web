@@ -1522,18 +1522,39 @@ function draw() {
         ctx.fillStyle = bGrad;
         ctx.fillRect(b.x, b.y, b.width, b.height);
 
-        let topX = b.x;
-        let topY = b.y;
-        let topW = b.width;
+        // --- Detailed Rooftop Cap (Inspired by tiled/brick ledge) ---
+        let roofX = b.x;
+        let roofY = b.y;
+        let roofW = b.width;
         if (b.hasTier) {
-            topX = b.x + (b.width - b.tierWidth) / 2;
-            topY = b.y - b.tierHeight;
-            topW = b.tierWidth;
-            ctx.fillRect(topX, topY, topW, b.tierHeight);
+            roofX = b.x + (b.width - b.tierWidth) / 2;
+            roofY = b.y - b.tierHeight;
+            roofW = b.tierWidth;
+            ctx.fillRect(roofX, roofY, roofW, b.tierHeight);
         }
-        ctx.fillStyle = '#222';
-        ctx.fillRect(topX - 2, topY, topW + 4, 10);
-        ctx.fillStyle = bGrad;
+
+        // 1. The Tiled Plane (Light Tan/Pink)
+        ctx.fillStyle = '#d9b8a8'; // Sandy/Tan tile color
+        ctx.fillRect(roofX - 4, roofY - 10, roofW + 8, 12);
+        
+        // Tile highlights and depth
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(roofX - 4, roofY - 10);
+        ctx.lineTo(roofX + roofW + 4, roofY - 10);
+        ctx.stroke();
+
+        // Vertical tile divisions
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+        for (let tx = roofX - 4; tx < roofX + roofW + 4; tx += 40) {
+            ctx.beginPath();
+            ctx.moveTo(tx, roofY - 10);
+            ctx.lineTo(tx + 5, roofY + 2); // Slight slant for perspective
+            ctx.stroke();
+        }
+
+        ctx.fillStyle = bGrad; // Reset for potential inner logic
 
         // Roof Styles
         let roofType = Math.floor((b.windowSeed * 100) % 5);
@@ -1541,32 +1562,32 @@ function draw() {
             ctx.strokeStyle = '#333'; ctx.lineWidth = 3;
             let numAntennas = 1 + Math.floor((b.windowSeed * 10) % 3);
             for (let i = 0; i < numAntennas; i++) {
-                let ax = topX + (topW * (0.1 + (i * 0.3) + (b.windowSeed * 0.1) % 0.2));
+                let ax = roofX + (roofW * (0.1 + (i * 0.3) + (b.windowSeed * 0.1) % 0.2));
                 let aHeight = 30 + ((b.windowSeed * (i + 1) * 40) % 60);
-                ctx.beginPath(); ctx.moveTo(ax, topY); ctx.lineTo(ax, topY - aHeight); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(ax, roofY - 10); ctx.lineTo(ax, roofY - 10 - aHeight); ctx.stroke();
             }
         } else if (roofType === 1) {
             let numBoxes = 1 + Math.floor((b.windowSeed * 10) % 4);
             for (let i = 0; i < numBoxes; i++) {
-                let bx = topX + (topW * ((i * 0.25) + (b.windowSeed * 0.1) % 0.1));
+                let bx = roofX + (roofW * ((i * 0.25) + (b.windowSeed * 0.1) % 0.1));
                 let bw = 20 + ((b.windowSeed * (i + 1) * 20) % 30);
                 let bh = 15 + ((b.windowSeed * (i + 2) * 20) % 40);
-                if (bx + bw < topX + topW) {
-                    ctx.fillRect(bx, topY - bh, bw, bh);
+                if (bx + bw < roofX + roofW) {
+                    ctx.fillRect(bx, roofY - 10 - bh, bw, bh);
                 }
             }
         } else if (roofType === 2) {
             let slantDir = b.windowSeed > 0.5 ? 1 : -1;
             ctx.beginPath();
-            if (slantDir === 1) { ctx.moveTo(topX, topY); ctx.lineTo(topX + topW, topY); ctx.lineTo(topX + topW, topY - 50 - ((b.windowSeed * 100) % 60)); }
-            else { ctx.moveTo(topX, topY); ctx.lineTo(topX + topW, topY); ctx.lineTo(topX, topY - 50 - ((b.windowSeed * 100) % 60)); }
+            if (slantDir === 1) { ctx.moveTo(roofX, roofY - 10); ctx.lineTo(roofX + roofW, roofY - 10); ctx.lineTo(roofX + roofW, roofY - 10 - 50 - ((b.windowSeed * 100) % 60)); }
+            else { ctx.moveTo(roofX, roofY - 10); ctx.lineTo(roofX + roofW, roofY - 10); ctx.lineTo(roofX, roofY - 10 - 50 - ((b.windowSeed * 100) % 60)); }
             ctx.closePath(); ctx.fill();
-        } else if (roofType === 3 && topW > 80) {
-            let domeRadius = Math.min(topW * 0.35, 70);
-            let domeX = topX + topW / 2;
-            ctx.beginPath(); ctx.arc(domeX, topY, domeRadius, Math.PI, 0); ctx.fill();
+        } else if (roofType === 3 && roofW > 80) {
+            let domeRadius = Math.min(roofW * 0.35, 70);
+            let domeX = roofX + roofW / 2;
+            ctx.beginPath(); ctx.arc(domeX, roofY - 10, domeRadius, Math.PI, 0); ctx.fill();
             ctx.strokeStyle = '#333'; ctx.lineWidth = 4;
-            ctx.beginPath(); ctx.moveTo(domeX, topY - domeRadius); ctx.lineTo(domeX, topY - domeRadius - 60); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(domeX, roofY - 10 - domeRadius); ctx.lineTo(domeX, roofY - 10 - domeRadius - 60); ctx.stroke();
         }
 
         // Window Helper
