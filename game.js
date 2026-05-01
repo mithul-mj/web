@@ -1516,12 +1516,9 @@ function draw() {
 
     // Buildings
     for (let b of buildings) {
-        // --- Building Body (Classic Old Brick) ---
+        // --- Building Body (Classic Old Brick - Single Dark Tone) ---
         let bGrad = ctx.createLinearGradient(0, b.y, 0, b.y + 800);
-        // Brick-themed color palette (Weathered Red/Brown/Tan)
-        let brickColors = ['#8b4513', '#a52a2a', '#7b3f00', '#5c4033', '#800000'];
-        let seed = b.windowSeed || Math.random(); // Fallback if seed is missing
-        let baseColor = brickColors[Math.floor(seed * brickColors.length)] || brickColors[0];
+        let baseColor = '#5d2a2c'; // Consistent Dark Burnt Crimson
         
         bGrad.addColorStop(0, baseColor);
         bGrad.addColorStop(1, '#1a0d0a'); // Darker bottom
