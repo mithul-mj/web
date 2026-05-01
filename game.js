@@ -1,7 +1,7 @@
 const canvas = document.getElementById('gameCanvas');
-const ctx = canvas ? canvas.getContext('2d') : null;
-const pCanvas = document.getElementById('playerCanvas');
-const pCtx = pCanvas ? pCanvas.getContext('2d') : null;
+const ctx = canvas.getContext('2d');
+const fgCanvas = document.getElementById('fgCanvas');
+const fgCtx = fgCanvas.getContext('2d');
 
 // --- Configuration ---
 const CONFIG = {
@@ -549,14 +549,16 @@ function resize() {
             adLayer.style.transformOrigin = 'top left';
             adLayer.style.transform = 'rotate(90deg) translateY(-100%)';
         }
-        
-        // Sync Player Canvas
-        pCanvas.width = gameState.width;
-        pCanvas.height = gameState.height;
-        pCanvas.style.width = screenH + 'px';
-        pCanvas.style.height = screenW + 'px';
-        pCanvas.style.transformOrigin = 'top left';
-        pCanvas.style.transform = 'rotate(90deg) translateY(-100%)';
+        // Sync FG Canvas
+        fgCanvas.width = screenH;
+        fgCanvas.height = screenW;
+        fgCanvas.style.width = screenH + 'px';
+        fgCanvas.style.height = screenW + 'px';
+        fgCanvas.style.position = 'absolute';
+        fgCanvas.style.transformOrigin = 'top left';
+        fgCanvas.style.transform = 'rotate(90deg) translateY(-100%)';
+        fgCanvas.style.top = '0';
+        fgCanvas.style.left = '0';
         document.body.style.overflow = 'hidden';
     } else {
         isPortrait = false;
@@ -564,6 +566,8 @@ function resize() {
         gameState.height = screenH;
         canvas.width = screenW;
         canvas.height = screenH;
+        fgCanvas.width = screenW;
+        fgCanvas.height = screenH;
         // Reset any rotation styles
         canvas.style.width = '';
         canvas.style.height = '';
@@ -572,6 +576,14 @@ function resize() {
         canvas.style.transform = '';
         canvas.style.top = '';
         canvas.style.left = '';
+
+        fgCanvas.style.width = '';
+        fgCanvas.style.height = '';
+        fgCanvas.style.position = '';
+        fgCanvas.style.transformOrigin = '';
+        fgCanvas.style.transform = '';
+        fgCanvas.style.top = '';
+        fgCanvas.style.left = '';
         // Reset UI overlay
         if (overlay) {
             overlay.style.width = '';
@@ -586,13 +598,6 @@ function resize() {
             adLayer.style.transformOrigin = '';
             adLayer.style.transform = '';
         }
-
-        // Sync Player Canvas
-        pCanvas.width = gameState.width;
-        pCanvas.height = gameState.height;
-        pCanvas.style.transform = 'none';
-        pCanvas.style.width = '100%';
-        pCanvas.style.height = '100%';
     }
     updateMobileButtonLayout();
 }
@@ -1390,57 +1395,12 @@ function drawCrane(ctx, anchorX, anchorY, isAligned) {
     ctx.restore();
 }
 
-// --- Web Drawing (On pCtx) ---
-function drawWeb() {
-    if (!pCtx) return;
-    if (player.anchor) {
-        let ax = player.anchor.x;
-        let ay = player.anchor.y;
-        let px = player.x;
-        let py = player.y;
-
-        pCtx.beginPath();
-        pCtx.moveTo(ax, ay);
-        pCtx.lineTo(px, py);
-        pCtx.strokeStyle = '#fff';
-        pCtx.lineWidth = 2;
-        pCtx.stroke();
-
-        // Web detail
-        pCtx.beginPath();
-        pCtx.arc(ax, ay, 4, 0, Math.PI * 2);
-        pCtx.fillStyle = '#fff';
-        pCtx.fill();
-    }
-}
-
 // --- Draw ---
 function draw() {
-    // 1. Clear both canvases
-    if (ctx) ctx.clearRect(0, 0, gameState.width, gameState.height);
-    if (pCtx) pCtx.clearRect(0, 0, gameState.width, gameState.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    fgCtx.clearRect(0, 0, fgCanvas.width, fgCanvas.height);
 
-    // 2. Draw Background & Buildings on BOTTOM canvas
-    if (ctx) {
-        drawBackground();
-        
-        ctx.save();
-        ctx.translate(-gameState.cameraX, -gameState.cameraY);
-        drawBuildings();
-        ctx.restore();
-    }
-
-    // 3. Draw Player & Webs on TOP canvas (above ads)
-    if (pCtx) {
-        pCtx.save();
-        pCtx.translate(-gameState.cameraX, -gameState.cameraY);
-        drawWeb();
-        drawPlayer();
-        pCtx.restore();
-    }
-}
-
-function drawBackground() {
+    // BACKGROUND CONTEXT (ctx) - Sky, Stars, Far City
     // Background Sky Gradient
     let skyGrad = ctx.createLinearGradient(0, 0, 0, gameState.height);
     skyGrad.addColorStop(0, '#050508');
@@ -1448,9 +1408,7 @@ function drawBackground() {
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, gameState.width, gameState.height);
 
-    // 0. CELESTIALS (Strict Altitude Reveal)
-    // Only starts revealing once cameraY is below -200 (Player is high up)
-    // Fully visible at cameraY = -800
+    // 0. CELESTIALS
     let altitudeThreshold = -200;
     let fullVisibilityHeight = -800;
     let altitudeFactor = clamp((gameState.cameraY - altitudeThreshold) / (fullVisibilityHeight - altitudeThreshold), 0, 1);
@@ -1470,54 +1428,42 @@ function drawBackground() {
             ctx.fill();
         }
 
-        // 2. THE MOON REACH (Dynamic Scaling & Motion)
-        // Descends from above (-500) to its reached position
+        // 2. THE MOON
         let moonScale = 0.5 + Math.pow(altitudeFactor, 3) * 6;
         let moonX = gameState.width * 0.7 - (altitudeFactor * (gameState.width * 0.2));
-        let moonY = -500 + (altitudeFactor * 750); // Comes from top
+        let moonY = -500 + (altitudeFactor * 750);
 
         ctx.save();
         ctx.translate(moonX, moonY);
         ctx.scale(moonScale, moonScale);
-
-        // Moon Glow (Stronger as you get closer)
         let glowSize = 100 + altitudeFactor * 100;
         let moonGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, glowSize);
         moonGlow.addColorStop(0, `rgba(255, 255, 255, ${0.1 + altitudeFactor * 0.2})`);
         moonGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
         ctx.fillStyle = moonGlow;
         ctx.beginPath(); ctx.arc(0, 0, glowSize, 0, Math.PI * 2); ctx.fill();
-
-        // Moon Surface
         ctx.fillStyle = '#f0f0f0';
         ctx.beginPath(); ctx.arc(0, 0, 60, 0, Math.PI * 2); ctx.fill();
-
-        // Details (Craters)
         ctx.fillStyle = '#e0e0e0';
         ctx.beginPath();
         ctx.arc(-20, -10, 15, 0, Math.PI * 2);
         ctx.arc(15, 20, 10, 0, Math.PI * 2);
         ctx.arc(10, -25, 8, 0, Math.PI * 2);
         ctx.fill();
-
         ctx.restore();
 
-        // 3. Atmosphere Blur (City fades/blurs as we "orbit")
         if (altitudeFactor > 0.8) {
             ctx.fillStyle = `rgba(255, 255, 255, ${(altitudeFactor - 0.8) * 0.5})`;
             ctx.fillRect(0, 0, gameState.width, gameState.height);
         }
-
         ctx.restore();
     }
 
-    // Background Parallax City Layers
+    // Parallax City Layers
     ctx.save();
     let pX = -(gameState.cameraX * 0.1) % 1500;
     let pY = -(gameState.cameraY * 0.05) + 200;
     ctx.translate(pX, pY);
-
-    // Layer 1: Far Distance (Dim)
     ctx.fillStyle = '#08080a';
     for (let i = -1; i < 3; i++) {
         let off = i * 1500;
@@ -1531,8 +1477,6 @@ function drawBackground() {
     let pX2 = -(gameState.cameraX * 0.25) % 1500;
     let pY2 = -(gameState.cameraY * 0.1) + 150;
     ctx.translate(pX2, pY2);
-
-    // Layer 2: Mid Distance (Slightly brighter)
     ctx.fillStyle = '#101015';
     for (let i = -1; i < 3; i++) {
         let off = i * 1500;
@@ -1541,301 +1485,120 @@ function drawBackground() {
         ctx.fillRect(off + 1100, gameState.height - 350, 180, 500);
     }
     ctx.restore();
-}
 
-function drawBuildings() {
-    // 2. Cranes (Background layer)
+    ctx.save();
+    ctx.translate(-gameState.cameraX, -gameState.cameraY);
+
+    // Cranes
     for (let a of anchors) {
         if (a.type === 'crane') {
             drawCrane(ctx, a.x, a.y, a.alignment === 'aligned');
         }
     }
 
-    ctx.restore(); // End world transform for tutorial text (if needed) or keep for following
-    ctx.save();
-    ctx.translate(-gameState.cameraX, -gameState.cameraY);
-
-    // Tutorial/Hint Text (placed here to be above buildings/anchors but below player)
-    ctx.font = '800 24px Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.shadowColor = 'rgba(0,0,0,0.7)';
-    ctx.shadowBlur = 10;
-
-    let text = "";
-    if (player.x < 1000) {
-        text = "BUILDING SPEED...";
-    } else if (player.x < 1700) {
-        text = "GET READY...";
-    } else if (player.x < 2200 && !player.hasSwung) {
-        text = isMobile ? "TAP & HOLD TO SWING!" : "HOLD SPACE / CLICK TO SWING!";
-        ctx.fillStyle = '#ff3333';
-    } else if (player.x > 2600 && player.x < 3500) {
-        // The Movie Moment
-        text = "QUEUE THE MUSIC!";
-        ctx.font = 'italic 800 32px Inter, sans-serif';
-        ctx.fillStyle = '#ffff00'; // Gold/Yellow
-    }
-
-    if (text) {
-        ctx.fillText(text, gameState.cameraX + gameState.width / 2, gameState.cameraY + gameState.height / 4);
-    }
-    ctx.shadowBlur = 0; // Reset shadow
-
     // Buildings
     for (let b of buildings) {
-        // Vertical Body Gradient
         let bGrad = ctx.createLinearGradient(0, b.y, 0, b.y + 800);
         bGrad.addColorStop(0, b.color || '#1a1a1a');
         bGrad.addColorStop(1, '#050508');
         ctx.fillStyle = bGrad;
-
-        // Draw Base
         ctx.fillRect(b.x, b.y, b.width, b.height);
 
         let topX = b.x;
         let topY = b.y;
         let topW = b.width;
-
-        // Draw Tier
         if (b.hasTier) {
             topX = b.x + (b.width - b.tierWidth) / 2;
             topY = b.y - b.tierHeight;
             topW = b.tierWidth;
             ctx.fillRect(topX, topY, topW, b.tierHeight);
         }
-
-        // Main roof ledge
         ctx.fillStyle = '#222';
         ctx.fillRect(topX - 2, topY, topW + 4, 10);
         ctx.fillStyle = bGrad;
 
-        // --- ROOF STYLES (Deterministic using windowSeed) ---
-        // 0: Antennas, 1: AC Boxes, 2: Slanted Roof, 3: Dome, 4: Flat/Empty
+        // Roof Styles
         let roofType = Math.floor((b.windowSeed * 100) % 5);
-
         if (roofType === 0) {
-            // Antennas
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 3;
-            let numAntennas = 1 + Math.floor((b.windowSeed * 10) % 3); // 1 to 3 antennas
+            ctx.strokeStyle = '#333'; ctx.lineWidth = 3;
+            let numAntennas = 1 + Math.floor((b.windowSeed * 10) % 3);
             for (let i = 0; i < numAntennas; i++) {
                 let ax = topX + (topW * (0.1 + (i * 0.3) + (b.windowSeed * 0.1) % 0.2));
                 let aHeight = 30 + ((b.windowSeed * (i + 1) * 40) % 60);
-
-                ctx.beginPath();
-                ctx.moveTo(ax, topY);
-                ctx.lineTo(ax, topY - aHeight);
-                ctx.stroke();
-
-                // Little crossbar sometimes
-                if (i === 0 && (b.windowSeed * 100) % 2 > 1) {
-                    ctx.beginPath();
-                    ctx.moveTo(ax - 8, topY - aHeight + 15);
-                    ctx.lineTo(ax + 8, topY - aHeight + 15);
-                    ctx.stroke();
-                }
+                ctx.beginPath(); ctx.moveTo(ax, topY); ctx.lineTo(ax, topY - aHeight); ctx.stroke();
             }
         } else if (roofType === 1) {
-            // AC Boxes / Water Towers (Match building gradient)
             let numBoxes = 1 + Math.floor((b.windowSeed * 10) % 4);
             for (let i = 0; i < numBoxes; i++) {
                 let bx = topX + (topW * ((i * 0.25) + (b.windowSeed * 0.1) % 0.1));
                 let bw = 20 + ((b.windowSeed * (i + 1) * 20) % 30);
                 let bh = 15 + ((b.windowSeed * (i + 2) * 20) % 40);
-
-                // Ensure it stays on roof
                 if (bx + bw < topX + topW) {
                     ctx.fillRect(bx, topY - bh, bw, bh);
-                    // Add little antenna on top of box sometimes
-                    if (i % 2 === 0) {
-                        ctx.strokeStyle = '#333';
-                        ctx.lineWidth = 2;
-                        ctx.beginPath();
-                        ctx.moveTo(bx + bw / 2, topY - bh);
-                        ctx.lineTo(bx + bw / 2, topY - bh - 20);
-                        ctx.stroke();
-                    }
                 }
             }
         } else if (roofType === 2) {
-            // Slanted Roof
             let slantDir = b.windowSeed > 0.5 ? 1 : -1;
             ctx.beginPath();
-            if (slantDir === 1) {
-                ctx.moveTo(topX, topY);
-                ctx.lineTo(topX + topW, topY);
-                ctx.lineTo(topX + topW, topY - 50 - ((b.windowSeed * 100) % 60));
-            } else {
-                ctx.moveTo(topX, topY);
-                ctx.lineTo(topX + topW, topY);
-                ctx.lineTo(topX, topY - 50 - ((b.windowSeed * 100) % 60));
-            }
-            ctx.closePath();
-            ctx.fill();
-
-            // Add an antenna on the peak
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            let peakX = slantDir === 1 ? topX + topW : topX;
-            let peakY = topY - 50 - ((b.windowSeed * 100) % 60);
-            ctx.moveTo(peakX, peakY);
-            ctx.lineTo(peakX, peakY - 40);
-            ctx.stroke();
+            if (slantDir === 1) { ctx.moveTo(topX, topY); ctx.lineTo(topX + topW, topY); ctx.lineTo(topX + topW, topY - 50 - ((b.windowSeed * 100) % 60)); }
+            else { ctx.moveTo(topX, topY); ctx.lineTo(topX + topW, topY); ctx.lineTo(topX, topY - 50 - ((b.windowSeed * 100) % 60)); }
+            ctx.closePath(); ctx.fill();
         } else if (roofType === 3 && topW > 80) {
-            // Dome Roof
             let domeRadius = Math.min(topW * 0.35, 70);
             let domeX = topX + topW / 2;
-            ctx.beginPath();
-            ctx.arc(domeX, topY, domeRadius, Math.PI, 0);
-            ctx.fill();
-
-            // Spire on top of dome
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(domeX, topY - domeRadius);
-            ctx.lineTo(domeX, topY - domeRadius - 60);
-            ctx.stroke();
+            ctx.beginPath(); ctx.arc(domeX, topY, domeRadius, Math.PI, 0); ctx.fill();
+            ctx.strokeStyle = '#333'; ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.moveTo(domeX, topY - domeRadius); ctx.lineTo(domeX, topY - domeRadius - 60); ctx.stroke();
         }
 
-        // Windows with Interior Parallax Effect
-        function drawWindows(x, y, w, h, seed) {
-            let winStepX = 35;
-            let winStepY = 45;
-            let winW = 14;
-            let winH = 20;
-            let padding = 20;
-
-            // Perspective factor: How much the interior moves
+        // Window Helper
+        function drawWindowsInternal(x, y, w, h, seed) {
+            let winStepX = 35; let winStepY = 45; let winW = 14; let winH = 20; let padding = 20;
             let centerX = gameState.cameraX + gameState.width / 2;
-
             for (let wx = x + padding; wx < x + w - padding; wx += winStepX) {
                 for (let wy = y + padding; wy < y + h - padding; wy += winStepY) {
                     if (wy + winH < gameState.cameraY || wy > gameState.cameraY + gameState.height) continue;
-
                     let winID = (wx * 1.3 + wy * 0.7 + seed * 1000) % 10;
                     let isLit = winID < 2.0;
-
-                    // 1. Draw Window Frame/Glass (Base)
                     ctx.fillStyle = isLit ? 'rgba(40, 40, 50, 1)' : 'rgba(0, 0, 0, 0.6)';
                     ctx.fillRect(wx, wy, winW, winH);
-
-                    // 2. INTERIOR PARALLAX MAPPING
-                    // Calculate relative offset from camera center
                     let relX = (wx - centerX) * 0.05;
                     let relY = (wy - (gameState.cameraY + gameState.height / 2)) * 0.05;
-
-                    // Draw "Back Wall"
                     if (isLit) {
-                        ctx.fillStyle = winID < 1.0 ? '#222233' : '#332222'; // Random room color
+                        ctx.fillStyle = winID < 1.0 ? '#222233' : '#332222';
                         ctx.fillRect(wx + relX + 2, wy + relY + 2, winW - 4, winH - 4);
-
-                        // Ceiling/Floor highlights
-                        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-                        ctx.lineWidth = 1;
-                        ctx.beginPath();
-                        ctx.moveTo(wx, wy);
-                        ctx.lineTo(wx + relX + 2, wy + relY + 2); // Corner line for depth
-                        ctx.stroke();
-
-                        // Warm glow inside
-                        ctx.fillStyle = winID < 1.2 ? 'rgba(255, 200, 100, 0.1)' : 'rgba(200, 220, 255, 0.08)';
-                        ctx.fillRect(wx, wy, winW, winH);
-                    } else {
-                        // Dark window silhouette
-                        ctx.fillStyle = 'rgba(255,255,255,0.02)';
-                        ctx.fillRect(wx + 2, wy + 2, 2, winH - 4); // Fake mullion reflection
                     }
-
-                    // 3. Glass Reflection Glow
-                    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(wx, wy, winW, winH);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1; ctx.strokeRect(wx, wy, winW, winH);
                 }
             }
         }
+        drawWindowsInternal(b.x, b.y, b.width, 400, b.windowSeed);
+        if (b.hasTier) drawWindowsInternal(b.x + (b.width - b.tierWidth) / 2, b.y - b.tierHeight, b.tierWidth, b.tierHeight, b.windowSeed + 0.1);
 
-        drawWindows(b.x, b.y, b.width, 400, b.windowSeed); // Only draw top 400px of base for perf
-        if (b.hasTier) drawWindows(b.x + (b.width - b.tierWidth) / 2, b.y - b.tierHeight, b.tierWidth, b.tierHeight, b.windowSeed + 0.1);
-
-        // Neon Sign
         if (b.hasNeon) {
-            ctx.fillStyle = b.neonColor;
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = b.neonColor;
+            ctx.fillStyle = b.neonColor; ctx.shadowBlur = 20; ctx.shadowColor = b.neonColor;
             ctx.fillRect(b.x + 20, b.y + 100, b.width - 40, 60);
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = '#000';
-            ctx.font = 'bold 24px Outfit';
-            ctx.textAlign = 'center';
+            ctx.shadowBlur = 0; ctx.fillStyle = '#000'; ctx.font = 'bold 24px Outfit'; ctx.textAlign = 'center';
             ctx.fillText("UPPER WEST", b.x + b.width / 2, b.y + 140);
         }
-
-        // --- 5. Tiled Ledge / Roof Cap (Upgrade) ---
-        let ledgeHeight = 12;
-        let ledgeColor = b.color;
-        
-        // Main Building Ledge
-        ctx.save();
-        ctx.fillStyle = ledgeColor;
-        ctx.filter = 'brightness(1.8)'; // Make it much lighter for the ledge
-        ctx.fillRect(b.x - 4, b.y - ledgeHeight / 2, b.width + 8, ledgeHeight);
-        
-        // Tile Segments
-        ctx.filter = 'none';
-        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-        ctx.lineWidth = 1;
-        let tWidth = 40;
-        for (let lx = b.x - 4; lx < b.x + b.width + 4; lx += tWidth) {
-            ctx.beginPath();
-            ctx.moveTo(lx, b.y - ledgeHeight / 2);
-            ctx.lineTo(lx, b.y + ledgeHeight / 2);
-            ctx.stroke();
-        }
-
-        // Tier Ledge (if exists)
-        if (b.hasTier) {
-            let tx = b.x + (b.width - b.tierWidth) / 2;
-            let ty = b.y - b.tierHeight;
-            ctx.filter = 'brightness(1.8)';
-            ctx.fillRect(tx - 4, ty - ledgeHeight / 2, b.tierWidth + 8, ledgeHeight);
-            ctx.filter = 'none';
-            for (let tlx = tx - 4; tlx < tx + b.tierWidth + 4; tlx += tWidth) {
-                ctx.beginPath();
-                ctx.moveTo(tlx, ty - ledgeHeight / 2);
-                ctx.lineTo(tlx, ty + ledgeHeight / 2);
-                ctx.stroke();
-            }
-        }
-        ctx.restore();
     }
 
     // Birds
     if (sprites.bird.loaded) {
         let frameW = sprites.bird.img.width / sprites.bird.cols;
         let frameH = sprites.bird.img.height / sprites.bird.rows;
-        let drawW = 32;
-        let drawH = 32;
-
+        let drawW = 32; let drawH = 32;
         for (let b of flock) {
-            ctx.save();
-            ctx.translate(b.x, b.y);
+            ctx.save(); ctx.translate(b.x, b.y);
             if (b.facingLeft) ctx.scale(-1, 1);
-
             let col = b.frame % sprites.bird.cols;
             let row = Math.floor(b.frame / sprites.bird.cols);
-
-            ctx.drawImage(
-                sprites.bird.img,
-                col * frameW, row * frameH, frameW, frameH,
-                -drawW / 2, -drawH, drawW, drawH // Offset to stand on roof
-            );
+            ctx.drawImage(sprites.bird.img, col * frameW, row * frameH, frameW, frameH, -drawW / 2, -drawH, drawW, drawH);
             ctx.restore();
         }
     }
 
-    // Atmospheric Ground Fog (Hides building bases)
+    // Fog
     let fogGrad = ctx.createLinearGradient(0, gameState.cameraY + gameState.height - 200, 0, gameState.cameraY + gameState.height);
     fogGrad.addColorStop(0, 'rgba(5, 5, 8, 0)');
     fogGrad.addColorStop(1, 'rgba(5, 5, 8, 1)');
@@ -1843,137 +1606,90 @@ function drawBuildings() {
     ctx.fillRect(gameState.cameraX, gameState.cameraY + gameState.height - 200, gameState.width, 200);
 
     // Anchors
-    let pulse = Math.sin(gameState.distance * 0.1) * 3; // Pulsing effect based on distance/time
-
+    let pulse = Math.sin(gameState.distance * 0.1) * 3;
     for (let a of anchors) {
         let isCrane = a.type === 'crane';
-
-        // 1. Base Glow (Always visible)
         ctx.fillStyle = isCrane ? 'rgba(255, 50, 50, 0.4)' : 'rgba(255, 255, 255, 0.3)';
-        ctx.beginPath();
-        let glowSize = isCrane ? 12 + pulse : 8;
-        ctx.arc(a.x, a.y, glowSize, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 2. Core Dot
+        ctx.beginPath(); ctx.arc(a.x, a.y, isCrane ? 12 + pulse : 8, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = isCrane ? '#ff3333' : '#cccccc';
-        ctx.beginPath();
-        ctx.arc(a.x, a.y, isCrane ? 4 : 3, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(a.x, a.y, isCrane ? 4 : 3, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
 
-        // White center for pop
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(a.x, a.y, isCrane ? 2 : 1, 0, Math.PI * 2);
-        ctx.fill();
 
-        // 3. Range Indicator
+    // FOREGROUND CONTEXT (fgCtx) - Player, Web, Particles, UI
+    fgCtx.save();
+    fgCtx.translate(-gameState.cameraX, -gameState.cameraY);
+
+    // Particles
+    for (let p of particles) {
+        fgCtx.fillStyle = p.color || '#fff';
+        fgCtx.globalAlpha = p.life / 30;
+        fgCtx.beginPath();
+        if (p.type === 'input_ripple') {
+            fgCtx.strokeStyle = '#fff';
+            fgCtx.lineWidth = 2;
+            fgCtx.arc(p.x, p.y, (20 - p.life) * 5, 0, Math.PI * 2);
+            fgCtx.stroke();
+        } else {
+            fgCtx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+            fgCtx.fill();
+        }
+    }
+
+    // Anchor Hints
+    for (let a of anchors) {
         let dx = a.x - player.x;
         let dy = a.y - player.y;
         let dist = Math.sqrt(dx * dx + dy * dy);
         let inRange = dist >= CONFIG.webLengthMin && dist <= CONFIG.webLengthMax;
-
-        // If reachable, draw a distinct ring
         if (inRange && dx > -100) {
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2; // Slightly thinner ring
-            ctx.beginPath();
-            ctx.arc(a.x, a.y, isCrane ? 10 : 8, 0, Math.PI * 2);
-            ctx.stroke();
-
-            // Connecting line hint (subtle)
+            fgCtx.strokeStyle = '#fff'; fgCtx.lineWidth = 2;
+            fgCtx.beginPath(); fgCtx.arc(a.x, a.y, a.type === 'crane' ? 10 : 8, 0, Math.PI * 2); fgCtx.stroke();
             if (player.state !== 'swinging') {
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-                ctx.lineWidth = 2;
-                ctx.setLineDash([5, 5]); // Make the hint line dotted
-                ctx.beginPath();
-
-                // Start from character's extended hand/edge
-                let ddx = a.x - player.x;
-                let ddy = a.y - player.y;
-                let ddist = Math.sqrt(ddx * ddx + ddy * ddy);
-                let startX = player.x + (ddx / ddist) * 20;
-                let startY = player.y + (ddy / ddist) * 20;
-
-                ctx.moveTo(startX, startY);
-                ctx.lineTo(a.x, a.y);
-                ctx.stroke();
-                ctx.setLineDash([]); // Reset to solid for other rendering
+                fgCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; fgCtx.lineWidth = 2; fgCtx.setLineDash([5, 5]);
+                fgCtx.beginPath();
+                let ddx = a.x - player.x; let ddy = a.y - player.y; let ddist = Math.sqrt(ddx * ddx + ddy * ddy);
+                fgCtx.moveTo(player.x + (ddx / ddist) * 20, player.y + (ddy / ddist) * 20);
+                fgCtx.lineTo(a.x, a.y); fgCtx.stroke(); fgCtx.setLineDash([]);
             }
         }
     }
 
-    // Web Rendering (White Silk Style)
+    // Web Line
     if (player.state === 'swinging' && player.anchor) {
-        ctx.save();
-
-        // Calculate origin at the edge of the character towards the anchor
+        fgCtx.save();
         let wdx = player.anchor.x - player.x;
         let wdy = player.anchor.y - player.y;
         let wdist = Math.sqrt(wdx * wdx + wdy * wdy);
-        
-        // Multi-strand web if grounded (Web Sprint)
         let numStrands = player.grounded ? 2 : 1;
-        
         for (let i = 0; i < numStrands; i++) {
             let offsetSide = (i - (numStrands - 1) / 2) * 10;
-            
-            ctx.strokeStyle = '#e0e0e0';
-            ctx.lineWidth = player.grounded ? 2 : 3;
-            ctx.beginPath();
-
-            let origin = {
-                x: player.x + (wdx / wdist) * 20,
-                y: player.y + (wdy / wdist) * 20
-            };
-            
-            // Offset origin for multi-strand
-            if (player.grounded) {
-                origin.y += offsetSide;
-            }
-
-            let sdx = player.anchor.x - origin.x;
-            let sdy = player.anchor.y - origin.y;
-
-            let cp1x = origin.x + sdx * 0.33;
-            let cp1y = origin.y + sdy * 0.33;
-
-            let cp2x = origin.x + sdx * 0.66;
-            let cp2y = origin.y + sdy * 0.66;
-
-            // Calculate tension/slack
+            fgCtx.strokeStyle = '#e0e0e0'; fgCtx.lineWidth = player.grounded ? 2 : 3;
+            fgCtx.beginPath();
+            let origin = { x: player.x + (wdx / wdist) * 20, y: player.y + (wdy / wdist) * 20 };
+            if (player.grounded) origin.y += offsetSide;
+            let sdx = player.anchor.x - origin.x; let sdy = player.anchor.y - origin.y;
+            let cp1x = origin.x + sdx * 0.33; let cp1y = origin.y + sdy * 0.33;
+            let cp2x = origin.x + sdx * 0.66; let cp2y = origin.y + sdy * 0.66;
             let slack = player.ropeLength - wdist;
-
             if (slack > 0 && !player.grounded) {
                 let curveStrength = Math.min(slack * 0.3, 20);
                 let p_len = Math.sqrt(sdx * sdx + sdy * sdy);
-                let px = -sdy / p_len;
-                let py = sdx / p_len;
+                let px = -sdy / p_len; let py = sdx / p_len;
                 let whipDir = player.vx > 0 ? 1 : -1;
-
-                cp1x += px * curveStrength * whipDir;
-                cp1y += py * curveStrength * whipDir;
-                cp2x -= px * curveStrength * whipDir;
-                cp2y -= py * curveStrength * whipDir;
-                cp1y += curveStrength * 0.5;
-                cp2y += curveStrength * 0.5;
+                cp1x += px * curveStrength * whipDir; cp1y += py * curveStrength * whipDir;
+                cp2x -= px * curveStrength * whipDir; cp2y -= py * curveStrength * whipDir;
+                cp1y += curveStrength * 0.5; cp2y += curveStrength * 0.5;
             } else if (player.grounded) {
-                // Taut, vibrating web for sprint
-                let vib = Math.sin(Date.now() * 0.05) * 2;
-                cp1y += vib;
-                cp2y -= vib;
+                let vib = Math.sin(Date.now() * 0.05) * 2; cp1y += vib; cp2y -= vib;
             }
-
-            ctx.moveTo(origin.x, origin.y);
-            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, player.anchor.x, player.anchor.y);
-            ctx.stroke();
-
-            // Bright core
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1;
-            ctx.stroke();
+            fgCtx.moveTo(origin.x, origin.y);
+            fgCtx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, player.anchor.x, player.anchor.y);
+            fgCtx.stroke();
+            fgCtx.strokeStyle = '#ffffff'; fgCtx.lineWidth = 1; fgCtx.stroke();
         }
-        ctx.restore();
+        fgCtx.restore();
 
         // Anchor impact splash
         if (Math.random() > 0.5) {
@@ -1988,297 +1704,104 @@ function drawBuildings() {
         }
     }
 
-    // Motion Trail
-    ctx.lineWidth = 15;
+    // Trails
+    fgCtx.lineWidth = 15;
     for (let i = 0; i < player.trails.length; i++) {
         let t = player.trails[i];
         let alpha = (i / player.trails.length) * 0.15;
-        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-        ctx.beginPath();
-        ctx.arc(t.x, t.y, player.radius * (i / player.trails.length), 0, Math.PI * 2);
-        ctx.fill();
+        fgCtx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        fgCtx.beginPath(); fgCtx.arc(t.x, t.y, player.radius * (i / player.trails.length), 0, Math.PI * 2); fgCtx.fill();
     }
 
-    // Player
-    drawPlayer();
+    // Final Player Drawing
+    drawPlayerOnCtx(fgCtx);
+    fgCtx.restore();
 
-    ctx.restore();
-
-    // --- Mobile HUD (drawn on top of everything, in screen space) ---
-    if (isMobile) {
-        drawMobileHUD();
+    // Tutorial Text on FG context (Screen Space)
+    fgCtx.save();
+    fgCtx.font = '800 24px Outfit, sans-serif'; // Switched to Outfit for consistency
+    fgCtx.textAlign = 'center';
+    fgCtx.textBaseline = 'middle';
+    let text = "";
+    if (player.x < 1000) text = "BUILDING SPEED...";
+    else if (player.x < 1700) text = "GET READY...";
+    else if (player.x < 2200 && !player.hasSwung) { text = isMobile ? "TAP & HOLD TO SWING!" : "HOLD SPACE / CLICK TO SWING!"; fgCtx.fillStyle = '#ff3333'; }
+    else if (player.x > 2600 && player.x < 3500) { text = "QUEUE THE MUSIC!"; fgCtx.font = 'italic 800 32px Outfit, sans-serif'; fgCtx.fillStyle = '#ffff00'; }
+    if (text) {
+        fgCtx.shadowColor = 'rgba(0,0,0,0.8)';
+        fgCtx.shadowBlur = 10;
+        fgCtx.fillText(text, gameState.width / 2, gameState.height * 0.3);
     }
+    fgCtx.restore();
+
+    if (isMobile) drawMobileHUD();
 }
 
-function drawMobileHUD() {
-    let showClimb = player.state === 'swinging';
-    let btnSize = touchState.btnSize;
-    let r = btnSize * 0.4; // corner radius
-
-    // Climb Up Button
-    let upAlpha = showClimb ? (touchState.climbUpActive ? 0.8 : 0.35) : 0.1;
-    let upX = touchState.btnUpX;
-    let upY = touchState.btnUpY;
-
-    // Button background
-    ctx.save();
-    ctx.globalAlpha = upAlpha;
-    ctx.fillStyle = touchState.climbUpActive ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.1)';
-    ctx.beginPath();
-    ctx.roundRect(upX, upY, btnSize, btnSize, r);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Up arrow
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    let cx = upX + btnSize / 2;
-    let cy = upY + btnSize / 2;
-    let arrowSize = btnSize * 0.25;
-    ctx.moveTo(cx, cy - arrowSize);
-    ctx.lineTo(cx - arrowSize, cy + arrowSize * 0.5);
-    ctx.lineTo(cx + arrowSize, cy + arrowSize * 0.5);
-    ctx.closePath();
-    ctx.fill();
-
-    // Glow when active
-    if (touchState.climbUpActive) {
-        ctx.shadowColor = '#00ffff';
-        ctx.shadowBlur = 15;
-        ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';
-        ctx.beginPath();
-        ctx.roundRect(upX, upY, btnSize, btnSize, r);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-    }
-    ctx.restore();
-
-    // Climb Down Button
-    let downAlpha = showClimb ? (touchState.climbDownActive ? 0.8 : 0.35) : 0.1;
-    let downX = touchState.btnDownX;
-    let downY = touchState.btnDownY;
-
-    ctx.save();
-    ctx.globalAlpha = downAlpha;
-    ctx.fillStyle = touchState.climbDownActive ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.1)';
-    ctx.beginPath();
-    ctx.roundRect(downX, downY, btnSize, btnSize, r);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Down arrow
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    let cx2 = downX + btnSize / 2;
-    let cy2 = downY + btnSize / 2;
-    ctx.moveTo(cx2, cy2 + arrowSize);
-    ctx.lineTo(cx2 - arrowSize, cy2 - arrowSize * 0.5);
-    ctx.lineTo(cx2 + arrowSize, cy2 - arrowSize * 0.5);
-    ctx.closePath();
-    ctx.fill();
-
-    // Glow when active
-    if (touchState.climbDownActive) {
-        ctx.shadowColor = '#ff00ff';
-        ctx.shadowBlur = 15;
-        ctx.fillStyle = 'rgba(255, 0, 255, 0.3)';
-        ctx.beginPath();
-        ctx.roundRect(downX, downY, btnSize, btnSize, r);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-    }
-    ctx.restore();
-
-    // Swipe hint text (show briefly when first swinging)
-    if (showClimb && !player._shownClimbHint) {
-        player._climbHintTimer = (player._climbHintTimer || 0) + 1;
-        if (player._climbHintTimer < 180) { // ~3 seconds
-            let hintAlpha = Math.min(1, player._climbHintTimer / 30) * Math.max(0, 1 - (player._climbHintTimer - 120) / 60);
-            ctx.save();
-            ctx.globalAlpha = hintAlpha;
-            ctx.fillStyle = '#fff';
-            ctx.font = '600 14px Outfit, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('SWIPE ↕ or TAP', touchState.btnUpX + btnSize / 2, touchState.btnUpY - 12);
-            ctx.fillText('TO CLIMB', touchState.btnUpX + btnSize / 2, touchState.btnUpY - 12 + 16);
-            ctx.restore();
-        } else {
-            player._shownClimbHint = true;
-        }
-    }
-}
-
-function attachAdToBuilding(b) {
-    if (b.hasAd) return; // Already has one
-
-    b.hasAd = true;
-    b.adIsTop = Math.random() > 0.5;
-
-    if (b.adIsTop) {
-        b.adWidth = 300;
-        b.adHeight = 120;
-        b.adRelX = random(0, b.width - b.adWidth);
-        b.adRelY = -b.adHeight - 45;
-    } else {
-        b.adWidth = 200;
-        b.adHeight = 160;
-        b.adRelX = random(20, Math.max(21, b.width - b.adWidth - 20));
-        b.adRelY = random(10, 80);
-    }
-
-    // Create the DOM element
-    const adEl = document.createElement('div');
-    adEl.className = 'billboard-ad' + (b.adIsTop ? ' on-top' : '');
-    adEl.style.width = b.adWidth + 'px';
-    adEl.style.height = b.adHeight + 'px';
-    
-    // Inject Adsterra Script Properly
-    const adId = 'adsterra-' + Math.floor(Math.random() * 1000000);
-    const scriptContainer = document.createElement('div');
-    scriptContainer.id = adId;
-    adEl.appendChild(scriptContainer);
-
-    const script1 = document.createElement('script');
-    script1.type = 'text/javascript';
-    script1.innerHTML = `
-        atOptions = {
-            'key' : '${AD_TEMPLATES.key}',
-            'format' : '${AD_TEMPLATES.format}',
-            'height' : ${AD_TEMPLATES.height},
-            'width' : ${AD_TEMPLATES.width},
-            'params' : {}
-        };
-    `;
-    adEl.appendChild(script1);
-
-    const script2 = document.createElement('script');
-    script2.type = 'text/javascript';
-    script2.src = `https://www.highperformanceformat.com/${AD_TEMPLATES.key}/invoke.js`;
-    adEl.appendChild(script2);
-
-    document.getElementById('ad-layer').appendChild(adEl);
-    b.adElement = adEl;
-}
-
-function updateBillboards() {
-    for (let b of buildings) {
-        if (b.hasAd && b.adElement) {
-            let screenX = b.x + b.adRelX - gameState.cameraX;
-            let screenY = b.y + b.adRelY - gameState.cameraY;
-
-            // Simple culling
-            if (screenX + b.adWidth < -100 || screenX > gameState.width + 100) {
-                b.adElement.style.display = 'none';
-            } else {
-                b.adElement.style.display = 'flex';
-                b.adElement.style.transform = `translate(${screenX}px, ${screenY}px)`;
-            }
-        }
-    }
-}
-
-
-// --- Draw Player (Gwen Stacy / Ghost-Spider Style) (On pCtx) ---
-function drawPlayer() {
-    if (!pCtx) return;
-    // Colors (Gwen Suit: White, Black, Magenta/Cyan highlights)
-    const C_WHITE = '#ffffff';
-    const C_BLACK = '#0d0d0d';
-    const C_PINK = '#ff00ff';
-    const C_CYAN = '#00ffff';
-
-    pCtx.lineCap = 'round';
-    pCtx.lineJoin = 'round';
-
-    let px = player.x;
-    let py = player.y;
-
-    let speed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
-
-    // Smooth rotation dampening
+function drawPlayerOnCtx(targetCtx) {
+    const sprites_copy = sprites; // Use global sprites
+    targetCtx.lineCap = 'round'; targetCtx.lineJoin = 'round';
     let targetAngle = 0;
     if (player.state === 'swinging' && player.anchor) {
-        let dx = player.x - player.anchor.x;
-        let dy = player.y - player.anchor.y;
+        let dx = player.x - player.anchor.x; let dy = player.y - player.anchor.y;
         targetAngle = Math.atan2(dy, dx) - Math.PI / 2;
     } else {
         targetAngle = Math.atan2(player.vy, player.vx * 1.5) / 1.5;
         targetAngle = clamp(targetAngle, -0.6, 0.6);
     }
-    let angle = targetAngle;
-
-    pCtx.save();
-    pCtx.translate(px, py);
-    pCtx.rotate(angle);
-
-    let t = player.animTimer;
-
-    let currentSprite = null;
-    let frameIndex = 0;
-
-    // Choose sprite based on state
-    if (player.state === 'swinging' && player.anchor) {
-        currentSprite = sprites.swing;
-        // Adjust swing animation speed
-        frameIndex = Math.floor(t * 8) % currentSprite.totalFrames;
-    } else if (player.grounded) {
-        currentSprite = sprites.run;
-        // Run animation speed adjusted for better visually pacing
-        frameIndex = Math.floor(t * speed * 0.4) % currentSprite.totalFrames;
-    } else {
-        // Falling or airborne
-        currentSprite = sprites.swing;
-        // Airborne animation
-        frameIndex = Math.floor(t * 5) % currentSprite.totalFrames;
-    }
+    targetCtx.save();
+    targetCtx.translate(player.x, player.y);
+    targetCtx.rotate(targetAngle);
+    let speed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
+    let currentSprite = null; let frameIndex = 0;
+    if (player.state === 'swinging' && player.anchor) { currentSprite = sprites_copy.swing; frameIndex = Math.floor(player.animTimer * 8) % currentSprite.totalFrames; }
+    else if (player.grounded) { currentSprite = sprites_copy.run; frameIndex = Math.floor(player.animTimer * speed * 0.4) % currentSprite.totalFrames; }
+    else { currentSprite = sprites_copy.swing; frameIndex = Math.floor(player.animTimer * 5) % currentSprite.totalFrames; }
 
     if (currentSprite && currentSprite.loaded) {
         let frameWidth = currentSprite.img.width / currentSprite.cols;
         let frameHeight = currentSprite.img.height / currentSprite.rows;
-
-        let col = frameIndex % currentSprite.cols;
-        let row = Math.floor(frameIndex / currentSprite.cols);
-
-        // Scale character down slightly to better match the original 40px hitbox size
-        let drawW = 64;
-        let drawH = 64;
-
-        let dx = -drawW / 2;
-        let dy = -drawH / 2;
-
-        if (currentSprite === sprites.run) {
-            // Align the bottom of the sprite's feet to the ground (player.radius)
-            // The running sprite feet are roughly at 95% of the frame height
-            dy = player.radius - (drawH * 0.95);
-        } else if (currentSprite === sprites.swing) {
-            // Swing sprite has a solid dark background, use lighten/screen to blend it
-            pCtx.globalCompositeOperation = 'screen';
-            // Center the swing sprite
-            dy = -drawH / 2;
-        }
-
-        // Offset the drawing to center on the character or feet
-        pCtx.drawImage(
-            currentSprite.img,
-            col * frameWidth, row * frameHeight, frameWidth, frameHeight,
-            dx, dy, drawW, drawH
-        );
-
-        // Reset composite operation
-        pCtx.globalCompositeOperation = 'source-over';
+        let col = frameIndex % currentSprite.cols; let row = Math.floor(frameIndex / currentSprite.cols);
+        let drawW = 64; let drawH = 64; let dx = -drawW / 2; let dy = -drawH / 2;
+        if (currentSprite === sprites_copy.run) dy = player.radius - (drawH * 0.95);
+        else if (currentSprite === sprites_copy.swing) targetCtx.globalCompositeOperation = 'screen';
+        targetCtx.drawImage(currentSprite.img, col * frameWidth, row * frameHeight, frameWidth, frameHeight, dx, dy, drawW, drawH);
+        targetCtx.globalCompositeOperation = 'source-over';
     } else {
-        // Fallback if images aren't loaded yet
-        pCtx.fillStyle = '#ff00ff';
-        pCtx.beginPath();
-        pCtx.arc(0, 0, player.radius, 0, Math.PI * 2);
-        pCtx.fill();
+        targetCtx.fillStyle = '#ff00ff'; targetCtx.beginPath(); targetCtx.arc(0, 0, player.radius, 0, Math.PI * 2); targetCtx.fill();
     }
+    targetCtx.restore();
+}
 
-    pCtx.restore();
+function drawMobileHUD() {
+    let showClimb = player.state === 'swinging';
+    let btnSize = touchState.btnSize;
+    let r = btnSize * 0.4;
+    let upAlpha = showClimb ? (touchState.climbUpActive ? 0.8 : 0.35) : 0.1;
+    let upX = touchState.btnUpX;
+    let upY = touchState.btnUpY;
+    fgCtx.save();
+    fgCtx.globalAlpha = upAlpha;
+    fgCtx.fillStyle = touchState.climbUpActive ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.1)';
+    fgCtx.beginPath(); fgCtx.roundRect(upX, upY, btnSize, btnSize, r); fgCtx.fill();
+    fgCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; fgCtx.lineWidth = 1.5; fgCtx.stroke();
+    fgCtx.fillStyle = '#fff'; fgCtx.beginPath();
+    let cx = upX + btnSize / 2; let cy = upY + btnSize / 2; let arrowSize = btnSize * 0.25;
+    fgCtx.moveTo(cx, cy - arrowSize); fgCtx.lineTo(cx - arrowSize, cy + arrowSize * 0.5); fgCtx.lineTo(cx + arrowSize, cy + arrowSize * 0.5);
+    fgCtx.closePath(); fgCtx.fill();
+    fgCtx.restore();
+
+    let downAlpha = showClimb ? (touchState.climbDownActive ? 0.8 : 0.35) : 0.1;
+    let downX = touchState.btnDownX; let downY = touchState.btnDownY;
+    fgCtx.save();
+    fgCtx.globalAlpha = downAlpha;
+    fgCtx.fillStyle = touchState.climbDownActive ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.1)';
+    fgCtx.beginPath(); fgCtx.roundRect(downX, downY, btnSize, btnSize, r); fgCtx.fill();
+    fgCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; fgCtx.lineWidth = 1.5; fgCtx.stroke();
+    fgCtx.fillStyle = '#fff'; fgCtx.beginPath();
+    let cx2 = downX + btnSize / 2; let cy2 = downY + btnSize / 2;
+    fgCtx.moveTo(cx2, cy2 + arrowSize); fgCtx.lineTo(cx2 - arrowSize, cy2 - arrowSize * 0.5); fgCtx.lineTo(cx2 + arrowSize, cy2 - arrowSize * 0.5);
+    fgCtx.closePath(); fgCtx.fill();
+    fgCtx.restore();
 }
 
 function random(min, max) { return Math.random() * (max - min) + min; }
